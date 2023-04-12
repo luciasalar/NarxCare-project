@@ -10,7 +10,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.impute import SimpleImputer, MissingIndicator
 from sklearn.preprocessing import StandardScaler, Normalizer
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 from sklearn.metrics import log_loss
@@ -34,7 +34,7 @@ def load_experiment(path_to_experiment):
 class PreprocessData:
 	def __init__(self, path):
 		self.data_path = path
-		self.label = 'Dx_OpioidOverdose_0to1_Y'
+		self.label = 'Dx_OpioidOverdose_0to1_Y' #outcome label: opioid overdose in the past one year
 
 
 	# def get_data(self):
@@ -49,22 +49,25 @@ class PreprocessData:
 
 	def get_cohorts(self):
 		'''
-		Get case-control 
+		Get case-control cohort 
 		'''
 		data = pd.read_csv(self.data_path + "simulated_data_big_sample.csv")
 
-
 		positive = data.loc[data['Dx_OpioidOverdose_0to1_Y'] == 1]
 		negative = data.loc[data['Dx_OpioidOverdose_0to1_Y'] == 0]
-
+		
+		#select 100 negative observations for every positive observations 
 		negative_cohort = negative.sample(n=positive.shape[0]*100, random_state=random.randint(0,10000))
+
+		#combine all the cohorts
 		case_control_cohort = pd.concat([positive,negative_cohort])
 
 		return case_control_cohort
 
 
 	def pre_process(self): 
-		"""get labels
+		"""
+		create feature matrix and outcome variable
 		output: feature matrix X, outcome y as a vector
 		"""
 		data = self.get_cohorts()
@@ -78,9 +81,9 @@ class PreprocessData:
 		''' split train test 8:2, stratify splittin
 		output: X train / test feature matrix, y train/test outcome
 		'''
-
+		#get feature matrix and outcome variable
 		X, y= self.pre_process()
-		# get 10% holdout set for testing
+		# get 20% holdout set for testing
 		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state = 300, stratify = y)
 
 		return X_train, X_test, y_train, y_test
@@ -113,142 +116,216 @@ class ColumnSelector:
 
 
 class Training:
+	"""
+	the training class includes a training pipeline, the training pipeline contains processing feature sets selected in experiment.yaml, feature processing includes normalization and imputation of the features. The model was trained with k fold cross validation, finally we compare the log loss between groups defined by sensitive attributes
+
+	"""
 	def __init__(self, X_train, X_test, y_train, y_test, parameters, features_list):
 		self.X_train = X_train #train feature
 		self.y_train = y_train #train outcome
 		self.X_test = X_test #test feature
 		self.y_test = y_test #test outcome
 		self.parameters = parameters #parameters, see experiment.yaml
-		self.path = "/Users/luciachen/Desktop/simulated_data/" #path for the simulated dataset
-		self.label = 'Dx_OpioidOverdose_0to1_Y' #outcome 
-		self.features_list = features_list #list of features include in training, see experiment.yaml
+		self.path = "/Users/luciachen/Dropbox/simulated_data/" #path for the simulated dataset
+		self.label = 'Dx_OpioidOverdose_0to1_Y'#outcome 
+		self.features_list = features_list #list of features included in training, see experiment.yaml
 
 
 	def get_feature_names(self):
-		"""Select all the merged features. """
+		"""Select features for training. """
 
 		fea_list = []
-		for fea in self.features_list: #select column names with keywords in dict
+		for fea in self.features_list: 
+			#select feature column in train feature matrix, feature columns are defined in experiment.yaml
 			f_list = [i for i in self.X_train.columns if fea in i]
 			fea_list.append(f_list)
 
-		#flatten a list
+		#flatten the feature list
 		flat = [x for sublist in fea_list for x in sublist]
-		#convert to transformer object
+
 		return flat
 
 
 
 	def setup_pipeline(self, classifier):
 		'''set up pipeline'''
+
 		#select features from experiment file
 		features_col = self.get_feature_names()
 
-
+		#pipeline
 		pipeline = Pipeline([
 
-			
-		# generate count vect features
-		  # # select other features, feature sets are defines in the yaml file
 		('other_features', Pipeline([
-
+				
+				#insert feature sets in the pipeline
 				('selector', ColumnSelector(columns=features_col)),
 				('impute', SimpleImputer(strategy='mean')),# impute nan with mean
 			 ])),
 
-
 		('clf', Pipeline([
-			   # ('impute', SimpleImputer(strategy='mean')), #impute nan with mean
+			
 			   ('scale', StandardScaler(with_mean=False)),  # scale features
-				('classifier', classifier),  # classifier
+				('classifier', classifier),  # classifier, classifer is defined in experiment.yaml
 		   
 				 ])),
 		])
 		return pipeline
 
 	def training_models(self, pipeline):
-		'''train models with grid search'''
+
+		'''train models with grid search, k fold cross validation, using accuracy to select the best model'''
 		grid_search_item = GridSearchCV(pipeline, self.parameters, cv=5, scoring='accuracy')
 		grid_search = grid_search_item.fit(self.X_train, self.y_train)
 		
 		return grid_search
 
+	def evaluation_methods(self, y_true, y_pred):
+		"""compute TPR, FPR, PPV """
+
+		#get confusion matrix for group 
+		CM = confusion_matrix(y_true, y_pred)
+		TN = CM[0][0]
+		FN = CM[1][0]
+		TP = CM[1][1]
+		FP = CM[0][1]
+
+		#calculate recall: TPR
+		TPR = TP / (TP + FN)
+
+		#calculate FPR
+		FPR = FP / (FP + TN)
+
+		#calculate PPV
+		PPV = TP / (TP + FP)
+
+		return TPR, FPR, PPV
+		
 
 	def get_group_loss(self, group_name):
+		"""compare the log loss in different groups
+		group_name: groups for comparison
+
+		"""
 
 		X_1 = X_test.loc[X_test[group_name] == 1]
 		X_0 = X_test.loc[X_test[group_name] == 0]
 
+		#merge feature set with outcome in test set
 		all_test = pd.concat([X_test.reset_index(drop=True), y_test.reset_index(drop=True)], axis=1)
-
+		
+		#subset outcome according to group name
 		y_1 = all_test.loc[all_test[group_name] == 1].Dx_OpioidOverdose_0to1_Y
 		y_0 = all_test.loc[all_test[group_name] == 0].Dx_OpioidOverdose_0to1_Y
 
+
+		#used the trained model to make predictions on different groups, y_pred_prob_1: prediciton, y_true_1: outcome
 		y_true_1, y_pred_prob_1 = y_1, grid_search.predict_proba(X_1)
 		y_true_0, y_pred_prob_0 = y_0, grid_search.predict_proba(X_0)
+
+		#calculate the log loss in each group
 		log_loss_1 = sklearn.metrics.log_loss(y_true_1, y_pred_prob_1)
 		log_loss_0 = sklearn.metrics.log_loss(y_true_0, y_pred_prob_0)
-
+		
+		
 		return log_loss_1, log_loss_0
+
+
+	def get_group_evaluation(self, group_name):
+		"""compare the log loss in different groups
+		group_name: groups for comparison
+
+		"""
+
+		X_1 = X_test.loc[X_test[group_name] == 1]
+		X_0 = X_test.loc[X_test[group_name] == 0]
+
+		#merge feature set with outcome in test set
+		all_test = pd.concat([X_test.reset_index(drop=True), y_test.reset_index(drop=True)], axis=1)
+		
+		#subset outcome according to group name
+		y_1 = all_test.loc[all_test[group_name] == 1].Dx_OpioidOverdose_0to1_Y
+		y_0 = all_test.loc[all_test[group_name] == 0].Dx_OpioidOverdose_0to1_Y
+
+
+		#used the trained model to make predictions on different groups, y_pred_prob_1: prediciton, y_true_1: outcome
+		y_true_1, y_pred_1 = y_1, grid_search.predict(X_1)
+		y_true_0, y_pred_0 = y_0, grid_search.predict(X_0)
+
+		#get confusion matrix for group 
+		TPR_1, FPR_1, PPV_1 = self.evaluation_methods(y_true_1, y_pred_1)
+		TPR_0, FPR_0, PPV_0 = self.evaluation_methods(y_true_0, y_pred_0)
+
+		return TPR_1, FPR_1, PPV_1, TPR_0, FPR_0, PPV_0 
+	
 
 
 
 #preprocess data, get train, test and outcome
-path = '/Users/luciachen/Desktop/simulated_data/' #change path in here
+path = '/Users/luciachen/Dropbox/simulated_data/' #change path in here
+
 
 p = PreprocessData(path)
 X_train, X_test, y_train, y_test = p.get_train_test_split()
 
 
-experiment = load_experiment(path + 'experiment.yaml')
+experiment = load_experiment(path + 'source/Python/experiment.yaml')
 
 #store results
 file_exists = os.path.isfile(path + 'results/test_result2.csv') #remember to create a results folder
 f = open(path + 'results/test_result2.csv', 'a')
 writer_top = csv.writer(f, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+
+#if result file doesn't exist, create file and write column names
 if not file_exists:
-    writer_top.writerow(['best_scores'] + ['best_parameters'] + ['report'] + ['log_loss'] + ['time'] + ['model'] +['feature_set'] + ['female_loss'] +['male_loss'] + ['nonWhite_loss'] + ['White_loss'] + ['backpain_loss'] + ['nonBackpain_loss'] + ['neckpain_loss'] + ['nonNeckpain_loss'] + ['Neuropathy_loss'] + ['nonNeuropathy_loss'])
-    f.close()
-    
+	writer_top.writerow(['best_scores'] + ['best_parameters'] + ['report'] + ['log_loss'] + ['time'] + ['model'] +['feature_set']  + ['nonWhite_TPR'] + ['White_TPR'] + ['backpain_TPR'] + ['nonBackpain_TPR'] + ['neckpain_TPR'] + ['nonNeckpain_TPR'] + ['Neuropathy_TPR'] + ['nonNeuropathy_TPR'] +  ['TPR_Fibromyalgia'] +  ['TPR_noFibromyalgia'] + ['TPR_PTSD'] + ['TPR_noPTSD'] +  ['TPR_MDD'] + ['TPR_noMDD'] + ['TPR_Homeless'] + ['TPR_noHomeless'] + ['nonWhite_FPR'] + ['White_FPR'] + ['backpain_FPR'] + ['nonBackpain_FPR'] + ['neckpain_FPR'] + ['nonNeckpain_FPR'] + ['Neuropathy_FPR'] + ['nonNeuropathy_FPR'] +  ['FPR_Fibromyalgia'] +  ['FPR_noFibromyalgia']  + ['FPR_PTSD'] + ['FPR_noPTSD'] +  ['FPR_MDD'] + ['FPR_noMDD'] + ['FPR_Homeless'] + ['FPR_noHomeless'] + ['nonWhite_PPV'] + ['White_PPV'] + ['backpain_PPV'] + ['nonBackpain_PPV'] + ['neckpain_PPV'] + ['nonNeckpain_PPV'] + ['Neuropathy_PPV'] + ['nonNeuropathy_PPV'] +  ['PPV_Fibromyalgia'] +  ['PPV_noFibromyalgia'] + ['PPV_PTSD'] + ['PPV_noPTSD'] +  ['PPV_MDD'] + ['PPV_noMDD'] + ['PPV_Homeless'] + ['PPV_noHomeless'])
+	f.close()
+	
+
+#loop through each classifier and parameters defined in experiment.yaml, then we get the classification report of general performance and compare the log loss in each group defined by sensitive attributes
 
 for classifier in experiment['experiment']:
 	parameters = experiment['experiment'][classifier]
-    
-    #loop through lists of features
+	
+	#loop through lists of features
 	for key, features_list in experiment['features'].items():
 		print(features_list)
-        
-        #train model 
+		
+		#train model 
 		train = Training(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test, parameters=parameters, features_list=features_list)
-        
-        #set up pipeline
+		
+		#set up pipeline
 		pipeline = train.setup_pipeline(eval(classifier)())
-        
-        #grid search
+		
+		#grid search
 		grid_search = train.training_models(pipeline)
 
 		#get predictions
 		y_true, y_pred = y_test, grid_search.predict(X_test)
-        
-        #get prediction probabilities
+		
+		#get prediction probabilities
 		y_true, y_pred_prob = y_test, grid_search.predict_proba(X_test)
 
 		#get classification report
 		report = classification_report(y_true, y_pred, digits=2)
 		log_loss = log_loss(y_true, y_pred_prob)
 
-		#sensitive attributes "female", "white", "Dx_Pain_Back", "Dx_Pain_Neuropathy_0to1_Y", "Dx_Pain_Neck_0to1_Y
-		female_loss, male_loss = train.get_group_loss('sex_female')
-		nonWhite_loss, White_loss = train.get_group_loss('race_NonWhite')
-		backpain_loss, nonBackpain_loss = train.get_group_loss('Dx_Pain_Back')
-		neckpain_loss, nonNeckpain_loss = train.get_group_loss('Dx_Pain_Neck_0to1_Y')
-		Neuropathy_loss, nonNeuropathy_loss = train.get_group_loss('Dx_Pain_Neuropathy_0to1_Y')
+		#sensitive attributes 
+		#TPR_female, FPR_female, PPV_female, TPR_male, FPR_male, PPV_male= train.get_group_evaluation('sex_female') #pred and outcomes are all 0 for female
+		TPR_White, FPR_White, PPV_White, TPR_nonWhite, FPR_nonWhite, PPV_nonWhite= train.get_group_evaluation('race_White')
+		TPR_backpain, FPR_backpain, PPV_backpain, TPR_nonBackpain, FPR_nonBackpain, PPV_nonBackpain= train.get_group_evaluation('Dx_Pain_Back') #back pain
+		TPR_neckpain, FPR_neckpain, PPV_neckpain, TPR_nonNeckpain, FPR_nonNeckpain, PPV_nonNeckpain= train.get_group_evaluation('Dx_Pain_Neck_0to1_Y') #neck pain
+		TPR_Neuropathy, FPR_Neuropathy, PPV_Neuropathy, TPR_nonNeuropathy, FPR_nonNeuropathy, PPV_nonNeuropathy = train.get_group_evaluation('Dx_Pain_Neuropathy_0to1_Y') #neurological pain
+		TPR_Fibromyalgia, FPR_Fibromyalgia, PPV_Fibromyalgia, TPR_noFibromyalgia, FPR_noFibromyalgia, PPV_noFibromyalgia= train.get_group_evaluation('Dx_Pain_Fibromyalgia_0to1_Y') #Fibromyalgia
+		#TPR_Endometriosis, FPR_Endometriosis, PPV_Endometriosis, TPR_noEndometriosis, FPR_noEndometriosis, PPV_noEndometriosis= train.get_group_evaluation('Dx_Endometriosis_0to1_Y')
+		TPR_PTSD, FPR_PTSD, PPV_PTSD, TPR_noPTSD, FPR_noPTSD, PPV_noPTSD= train.get_group_evaluation('Dx_PTSD_1to2_Y') #PTSD
+		TPR_MDD, FPR_MDD, PPV_MDD, TPR_noMDD, FPR_noMDD, PPV_noMDD= train.get_group_evaluation('Dx_MDD_12m') #MDD
+		TPR_Homeless, FPR_Homeless, PPV_Homeless, TPR_noHomeless, FPR_noHomeless, PPV_noHomeless= train.get_group_evaluation('Dx_Homeless_1to2_Y') #Homelessness
 
+		#combine the result columns: grid search best score, best parameters, classification report, log loss, experiment time, classifier, feature set, log loss of sensitive groups
+		result_row = [[grid_search.best_score_, grid_search.best_params_, report, log_loss, str(datetime.datetime.now()), classifier, features_list,  TPR_nonWhite, TPR_White, TPR_backpain, TPR_nonBackpain, TPR_neckpain, TPR_nonNeckpain, TPR_Neuropathy, TPR_nonNeuropathy, TPR_Fibromyalgia, TPR_noFibromyalgia, TPR_PTSD, TPR_noPTSD, TPR_MDD, TPR_noMDD, TPR_Homeless, TPR_noHomeless, FPR_nonWhite, FPR_White, FPR_backpain, FPR_nonBackpain, FPR_neckpain, FPR_nonNeckpain, FPR_Neuropathy, FPR_nonNeuropathy, FPR_Fibromyalgia, FPR_noFibromyalgia,  FPR_PTSD, FPR_noPTSD, FPR_MDD, FPR_noMDD, FPR_Homeless, FPR_noHomeless, PPV_nonWhite, PPV_White, PPV_backpain, PPV_nonBackpain, PPV_neckpain, PPV_nonNeckpain, PPV_Neuropathy, PPV_nonNeuropathy, PPV_Fibromyalgia, PPV_noFibromyalgia, PPV_PTSD, PPV_noPTSD, PPV_MDD, PPV_noMDD, PPV_Homeless, PPV_noHomeless]]
 
-		#define a row of results we want to store
-		result_row = [[grid_search.best_score_, grid_search.best_params_, report, log_loss, str(datetime.datetime.now()), classifier, features_list, female_loss, male_loss, nonWhite_loss, White_loss, backpain_loss, nonBackpain_loss, neckpain_loss, nonNeckpain_loss, Neuropathy_loss, nonNeuropathy_loss]]
-
-		# store test result
+		# # store test result
 		f = open(path + 'results/test_result2.csv', 'a')
 		writer_top = csv.writer(f, delimiter=',', quoting=csv.QUOTE_MINIMAL)
 
@@ -257,7 +334,7 @@ for classifier in experiment['experiment']:
 		f.close()
 		gc.collect()
 
-#append logloss with feature matrix
+
 
 
 
