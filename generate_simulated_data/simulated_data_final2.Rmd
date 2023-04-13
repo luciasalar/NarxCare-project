@@ -184,6 +184,27 @@ sum(Dx_SAE_Acetaminophen_0to1_Y  )
 cor(Dx_SAE_Acetaminophen_0to1_Y, Ux_OP_PoC_ED_730days)
 summary(Dx_SAE_Acetaminophen_0to1_Y )
 
+#X_7:Serious Adverse Event - Poisoning by Sedative
+error=rnorm(number_of_cases, 2, 10)
+xb <-   -36 + 0.5*Ux_OP_PoC_ED  + error
+p <- 1/(1 + exp(-xb))
+Dx_SAE_Sedative_0to1_Y  <- rbinom(n = number_of_cases, size = 1, prob = p)
+#checking the stats
+sum(Dx_SAE_Sedative_0to1_Y)
+cor(Dx_SAE_Sedative_0to1_Y, Ux_OP_PoC_ED)
+summary(Dx_SAE_Sedative_0to1_Y)
+
+
+#X_7: Serious Adverse Event - Vehicular Accidents
+error=rnorm(number_of_cases, 2, 10)
+xb <-   -28 + 0.8*Ux_OP_PoC_ED  + error
+p <- 1/(1 + exp(-xb))
+Dx_SAE_Vehicle_0to1_Y  <- rbinom(n = number_of_cases, size = 1, prob = p)
+#checking the stats
+sum(Dx_SAE_Vehicle_0to1_Y)
+cor(Dx_SAE_Vehicle_0to1_Y, Ux_OP_PoC_ED_730days)
+summary(Dx_SAE_Vehicle_0to1_Y)
+
 #X_7:Serious Adverse Event - Other Accidents, no correlation with other vars m = 0.002
 
 error=rnorm(number_of_cases, 2, 10)
@@ -208,26 +229,6 @@ cor(Dx_SAE_OtherAccident_0to1_Y, Ux_OP_PoC_ED)
 
 
 
-
-#X_7:Serious Adverse Event - Poisoning by Sedative
-error=rnorm(number_of_cases, 2, 10)
-xb <-   -36 + 0.5*Ux_OP_PoC_ED  + error
-p <- 1/(1 + exp(-xb))
-Dx_SAE_Sedative_0to1_Y  <- rbinom(n = number_of_cases, size = 1, prob = p)
-#checking the stats
-sum(Dx_SAE_Sedative_0to1_Y)
-cor(Dx_SAE_Sedative_0to1_Y, Ux_OP_PoC_ED)
-summary(Dx_SAE_Sedative_0to1_Y)
-
-#X_7: Serious Adverse Event - Vehicular Accidents
-error=rnorm(number_of_cases, 2, 10)
-xb <-   -28 + 0.8*Ux_OP_PoC_ED  + error
-p <- 1/(1 + exp(-xb))
-Dx_SAE_Vehicle_0to1_Y  <- rbinom(n = number_of_cases, size = 1, prob = p)
-#checking the stats
-sum(Dx_SAE_Vehicle_0to1_Y)
-cor(Dx_SAE_Vehicle_0to1_Y, Ux_OP_PoC_ED_730days)
-summary(Dx_SAE_Vehicle_0to1_Y)
 
 #X8: insomnia medication, Barbiturate, Sedative Use Disorder, binary
 #Insomnia medications prescribed in the past 365 days, this is a random variable with binomial distribution with a probability of success of 0.0004 on each trial.
@@ -458,7 +459,7 @@ summary(Dx_Endometriosis_0to1_Y)
 
 
 #X24 mental illnesses
-#Elixhauser psychoses past year, this one is related to age (-0.14) and substance use such as alcohol(0.11) cannabis, cocaine, nicotine, depression
+#psychoses past year, this one is related to age (-0.14) and substance use such as alcohol(0.11) cannabis, cocaine, nicotine, depression
 error=rnorm(number_of_cases, 0, 2)
 xb <-   -1 + 8*Dx_AlcoholUD_0to1_Y  - 18*agegroup_ge50 - 20*agegroup_ge60  -  45*agegroup_ge70 + error
 p <- 1/(1 + exp(-xb))
@@ -492,8 +493,6 @@ sum(Dx_PTSD_1to2_Y)
 summary(Dx_PTSD_1to2_Y)
 cor.test(Dx_PTSD_1to2_Y, Ux_OP_PoC_ED)
 cor.test(Dx_PTSD_1to2_Y, TotalNumOfAppt)
-
-
 
 
 
@@ -548,7 +547,7 @@ cor.test(Dx_EH_Obesity_1to2_Y, TotalNumOfAppt)
 ```{r outcome}
 # ## build Y variable
 error=rnorm(number_of_cases, 0, 50)
-xb <- -400 +  1*Ux_OP_PoC_ED + 10*Ux_OP_PoC_UC +  195*MOPROB_AllAppt + 30*Ux_OP_PoC_TobaccoCessation +  3.5*TotalNumOfAppt  + 3*Ux_OP_MHOC_HBPC  + 3*Dx_SAE_Acetaminophen_0to1_Y  + 30*Dx_SAE_OtherDrug_0to1_Y + 30*Dx_SAE_Sedative_0to1_Y + 20*Dx_SAE_Falls_0to1_Y + 20*Dx_SAE_OtherAccident_0to1_Y  + 60*Dx_SAE_Vehicle_0to1_Y +   3*Rx_Insomnia_0to365_D + 35*Paton_Rx_Insomnia  + Rx_OAT_methadone_12m + Rx_OAT_buprenorphine_12m + 0.5*Rx_Anxiolytic_0to365_D +  1*Dx_SUD_CatchAll_RV2_0to1_Y + 3*Dx_SedativeUD_0to1_Y + 1*Dx_Amphetamine_OtherStim_UD_0to1  + 0.004*agegroup_ls30 + 28*agegroup_ge30 + 28*agegroup_ge40 + 28*agegroup_ge50 + 28*agegroup_ge60 - 30*agegroup_ge70 - 25*sex_female + 43*race_White + 1*Dx_AlcoholUD_0to1_Y + 20*Dx_UDS1_12m + 20*Dx_UDS2_12m+   Dx_UDS3_12m + Ux_RehMedPain + 35*Dx_Pain_Neuropathy_0to1_Y  + 35*Dx_Pain_Back + 35*Dx_Pain_Neck_0to1_Y + 40*Dx_Pain_Urogenital_0to1_Y + Dx_Pain_Fibromyalgia_0to1_Y  +  Dx_Endometriosis_0to1_Y + 20*Dx_MDD_12m+ 5*EH_Psychoses + 0.5*Dx_PTSD_1to2_Y  + 0.005*Rx_Medd + 0.005*Rx_Medd_10m + 0.003*Rx_Medd_11m + 0.001*Rx_Medd_1m +0.001*Rx_Medd_2m + 0.001*Rx_Medd_3m + 0.001*Rx_Medd_4m + 0.001*Rx_Medd_5m + 0.003*Rx_Medd_6m + 0.003*Rx_Medd_7m + 0.005*Rx_Medd_8m + 0.004*Rx_Medd_9m + 0.1*Dx_Homeless_1to2_Y +  0.5*Dx_EH_Obesity_1to2_Y  + 5*Rx_OpioidForPain_0to182_D + 10*Rx_OpioidForPain_182to365_D + error
+xb <- -400 +  1*Ux_OP_PoC_ED + 10*Ux_OP_PoC_UC + 30*Ux_OP_PoC_TobaccoCessation  + 3*Ux_OP_MHOC_HBPC +   3.5*TotalNumOfAppt + 195*MOPROB_AllAppt   + 3*Dx_SAE_Acetaminophen_0to1_Y  + 30*Dx_SAE_Sedative_0to1_Y + 60*Dx_SAE_Vehicle_0to1_Y  + 20*Dx_SAE_OtherAccident_0to1_Y + 30*Dx_SAE_OtherDrug_0to1_Y  + 20*Dx_SAE_Falls_0to1_Y  +   3*Rx_Insomnia_0to365_D + 35*Paton_Rx_Insomnia  + Rx_OAT_methadone_12m + Rx_OAT_buprenorphine_12m + 0.5*Rx_Anxiolytic_0to365_D +  1*Dx_SUD_CatchAll_RV2_0to1_Y + 3*Dx_SedativeUD_0to1_Y + 1*Dx_Amphetamine_OtherStim_UD_0to1 + 1*Dx_AlcoholUD_0to1_Y + 0.004*agegroup_ls30 + 28*agegroup_ge30 + 28*agegroup_ge40 + 28*agegroup_ge50 + 28*agegroup_ge60 - 30*agegroup_ge70 - 25*sex_female + 43*race_White  + 20*Dx_UDS1_12m + 20*Dx_UDS2_12m+   Dx_UDS3_12m + Ux_RehMedPain + 35*Dx_Pain_Neuropathy_0to1_Y  + 35*Dx_Pain_Back + 35*Dx_Pain_Neck_0to1_Y + 1*Dx_Pain_Urogenital_0to1_Y + 1*Dx_Pain_Fibromyalgia_0to1_Y  +  20*Dx_Endometriosis_0to1_Y + 20*Dx_MDD_12m+ 5*EH_Psychoses + 0.5*Dx_PTSD_1to2_Y  + 0.005*Rx_Medd + 0.005*Rx_Medd_10m + 0.003*Rx_Medd_11m + 0.001*Rx_Medd_1m +0.001*Rx_Medd_2m + 0.001*Rx_Medd_3m + 0.001*Rx_Medd_4m + 0.001*Rx_Medd_5m + 0.003*Rx_Medd_6m + 0.003*Rx_Medd_7m + 0.005*Rx_Medd_8m + 0.004*Rx_Medd_9m + 0.1*Dx_Homeless_1to2_Y +  0.5*Dx_EH_Obesity_1to2_Y  + 5*Rx_OpioidForPain_0to182_D + 10*Rx_OpioidForPain_182to365_D + error
 
 
 p <- 1/(1 + exp(-xb))
@@ -633,4 +632,62 @@ cohorts <- rbind(positive, negative_df)
 shuffled_cohorts = cohorts[sample(1:nrow(cohorts)), ]
 
 write.csv(shuffled_cohorts, "/Users/luciachen/Desktop/Desktop_MacbookPro/simulated_data/cohorts_data.csv")
+```
+
+
+Task 2: shift data distribution 
+```{r datashift}
+#attempt 1: here we reduce the mean of the variable by certain percentage
+reduction <- function (val, redu) {
+  #this function reduce a value by certain amount
+  if(val > 0) {
+      new_val <- val - redu
+  }
+  else{
+    new_val = 0
+  }
+  return (new_val)
+}
+
+transform_mean <- function(percent, var){
+  #number of observation with y > 0
+  N1 <- sum(var != 0) 
+  #new value = mean * percent that we want to reduce
+  reduce  <- mean(var)*percent
+  print(reduce)
+  #normalize the variable to be applid
+  reduce_scaled <- reduce*(length(var)/N1)
+  print(reduce_scaled)
+  #apply reduction function on normal
+  var_new <- unlist(mapply(FUN=reduction, val=var, redu = reduce_scaled, USE.NAMES=FALSE))
+  
+    
+  return (var_new)
+}
+
+reduce_precentage = 0.1 #suppose we reduce the mean by 3 percent
+Rx_Medd_new <- transform_mean(reduce_precentage, Rx_Medd)
+Rx_Medd_10m_new <- transform_mean(reduce_precentage, Rx_Medd_10m)
+Rx_Medd_11m_new <-transform_mean(reduce_precentage, Rx_Medd_11m)
+Rx_Medd_1m_new <- transform_mean(reduce_precentage, Rx_Medd_10m)
+Rx_Medd_2m_new <- transform_mean(reduce_precentage, Rx_Medd_2m)
+Rx_Medd_3m_new <- transform_mean(reduce_precentage, Rx_Medd_3m)
+Rx_Medd_4m_new <- transform_mean(reduce_precentage, Rx_Medd_4m)
+Rx_Medd_5m_new <- transform_mean(reduce_precentage, Rx_Medd_5m)
+Rx_Medd_6m_new <- transform_mean(reduce_precentage, Rx_Medd_6m)
+Rx_Medd_7m_new <- transform_mean(reduce_precentage, Rx_Medd_7m)
+Rx_Medd_8m_new <- transform_mean(reduce_precentage, Rx_Medd_8m)
+Rx_Medd_9m_new <- transform_mean(reduce_precentage, Rx_Medd_9m)
+
+#combine the new variables with the original variables to create a new dataset
+simulated_data <- cbind(Ux_OP_PoC_ED, Ux_OP_PoC_UC, MOPROB_AllAppt, Ux_OP_PoC_TobaccoCessation,  TotalNumOfAppt, Ux_OP_MHOC_HBPC, Rx_OpioidForPain_0to182_D, Rx_OpioidForPain_182to365_D,  Rx_Insomnia_0to365_D, Paton_Rx_Insomnia, Dx_SAE_Acetaminophen_0to1_Y, Dx_SAE_Falls_0to1_Y, Dx_SAE_OtherAccident_0to1_Y, Dx_SAE_OtherDrug_0to1_Y, Dx_SAE_Sedative_0to1_Y, Dx_SAE_Vehicle_0to1_Y, Dx_SedativeUD_0to1_Y, Dx_SUD_CatchAll_RV2_0to1_Y, Dx_AlcoholUD_0to1_Y, Dx_Amphetamine_OtherStim_UD_0to1, Rx_Medd, Rx_Medd_10m, Rx_Medd_11m, Rx_Medd_1m, Rx_Medd_2m, Rx_Medd_3m, Rx_Medd_4m, Rx_Medd_5m, Rx_Medd_6m, Rx_Medd_7m, Rx_Medd_8m,Rx_Medd_9m, agegroup_ls30, agegroup_ge30, agegroup_ge40, agegroup_ge50, agegroup_ge60, agegroup_ge70, sex_female, race_White,  Dx_UDS1_12m, Dx_UDS2_12m, Dx_UDS3_12m,  EH_Psychoses, Dx_MDD_12m, Ux_RehMedPain, Dx_Pain_Urogenital_0to1_Y, Dx_Pain_Neuropathy_0to1_Y, Dx_Pain_Back, Dx_Pain_Neck_0to1_Y, Dx_Pain_Fibromyalgia_0to1_Y, Dx_Endometriosis_0to1_Y, Dx_PTSD_1to2_Y,Dx_Homeless_1to2_Y, Rx_Anxiolytic_0to365_D,  Rx_OAT_methadone_12m, Rx_OAT_buprenorphine_12m, Dx_OpioidOverdose_0to1_Y)
+
+#store the dataset
+simulated_data <- as.data.frame(simulated_data)
+simulated_data <- data.table(simulated_data)
+write.csv(simulated_data, "/Users/luciachen/Desktop/simulated_data/simulated_data_big_sample_reduced_mean.csv")
+
+
+
+
 ```
