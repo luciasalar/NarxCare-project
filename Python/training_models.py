@@ -37,16 +37,6 @@ class PreprocessData:
 		self.label = 'Dx_OpioidOverdose_0to1_Y' #outcome label: opioid overdose in the past one year
 
 
-	# def get_data(self):
-	# 	"""Read data
-	# 	output: pandas dataframe
-	# 	"""
-
-	# 	data = pd.read_csv(self.data_path + "cohorts_data.csv")
-
-	# 	return data
-
-
 	def get_cohorts(self):
 		'''
 		Get case-control cohort 
@@ -84,7 +74,7 @@ class PreprocessData:
 		#get feature matrix and outcome variable
 		X, y= self.pre_process()
 		# get 20% holdout set for testing
-		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state = 300, stratify = y)
+		X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state = 300, stratify = y)
 
 		return X_train, X_test, y_train, y_test
 
@@ -121,6 +111,8 @@ class Training:
 
 	"""
 	def __init__(self, X_train, X_test, y_train, y_test, parameters, features_list):
+
+		#define variables pass in the functions within the class
 		self.X_train = X_train #train feature
 		self.y_train = y_train #train outcome
 		self.X_test = X_test #test feature
@@ -232,7 +224,7 @@ class Training:
 
 
 	def get_group_evaluation(self, group_name):
-		"""compare the log loss in different groups
+		"""compare performance in different groups
 		group_name: groups for comparison
 
 		"""
@@ -267,7 +259,6 @@ path = '/Users/luciachen/Dropbox/simulated_data/' #change path in here
 
 p = PreprocessData(path)
 X_train, X_test, y_train, y_test = p.get_train_test_split()
-
 
 experiment = load_experiment(path + 'source/Python/experiment.yaml')
 
@@ -310,7 +301,7 @@ for classifier in experiment['experiment']:
 		report = classification_report(y_true, y_pred, digits=2)
 		log_loss = log_loss(y_true, y_pred_prob)
 
-		#sensitive attributes 
+		#Here we compare group performance 
 		#TPR_female, FPR_female, PPV_female, TPR_male, FPR_male, PPV_male= train.get_group_evaluation('sex_female') #pred and outcomes are all 0 for female
 		TPR_White, FPR_White, PPV_White, TPR_nonWhite, FPR_nonWhite, PPV_nonWhite= train.get_group_evaluation('race_White')
 		TPR_backpain, FPR_backpain, PPV_backpain, TPR_nonBackpain, FPR_nonBackpain, PPV_nonBackpain= train.get_group_evaluation('Dx_Pain_Back') #back pain
