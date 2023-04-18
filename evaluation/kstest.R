@@ -5,6 +5,7 @@ library(dplyr)
 
 
 ##Task 1: ks test
+#This task performs ks test score on the prediction results (probability) between two classes  
 #read result file, this result file contains the prediction probability and the  outcome
 re <- read.csv("/Users/luciachen/Desktop/simulated_data/results/CVXR_unadjustedLG_datashift.csv")
 
@@ -65,11 +66,11 @@ ggplot(bar_chart_df, aes(points_bin, percentage)) +
   geom_bar(aes(fill = group), position = "dodge", stat="identity") +
   theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 0.5, size = 16), axis.text.y = element_text(size = 16), axis.title.y = element_text(size = 16))
 
-# Task 3: odds ratio 
-
+# Task 3: calculated the odds ratio (O) between the odds of the bucket with an ORS lower than 100  and the odds of a bucket  with a score greater than 100.
 overdose_all <- cbind(overdose_bins_cul_zero, overdose_bins_cul)
 overdose_raw <- overdose_all %>% dplyr::select('recoded_y','Dx_OpioidOverdose_0to1_Y')
 
+#calculate the odds ratio (bin1: bin(n))
 calculate_odds_ratio <- function(row_number) {
   odds_ratio_bin <- as.matrix(overdose_raw[c(1,row_number),], nrow=2, ncol=2, byrow=TRUE)
   
@@ -99,6 +100,8 @@ calculate_odds_ratio(15)
 
 
 #Task 4
+#In this task we first resacle the Medd variable, so that the range of our Medd is similar to the range reported on NarxCare white paper. Then we cut the bins according to preset values reported 
+#on the white paper and 
 #Medd as criteria
 summary(compare$Rx_Medd_2m)
 
