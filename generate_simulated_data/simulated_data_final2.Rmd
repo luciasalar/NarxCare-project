@@ -158,10 +158,10 @@ Here we use functional form to create binary variables
 
 ```{r binary, echo=FALSE}
 set.seed(100)
-#X_7 Serious Adverse Event, these events are weakly correlated with hospital visits
+#Serious Adverse Event, these events are weakly correlated with hospital visits
 #var1, pho, threshold, seed, location_var2, shape_var2, threshold_2
 
-#X_7:Serious Adverse Event -fall
+#X_34:Serious Adverse Event -fall
 error=rnorm(number_of_cases, 5, 10)
 xb <-   -30 + 1.5*Ux_OP_PoC_ED  + 0.04*TotalNumOfAppt + error
 p <- 1/(1 + exp(-xb))
@@ -172,8 +172,7 @@ summary(Dx_SAE_Falls_0to1_Y )
 cor.test(Dx_SAE_Falls_0to1_Y, Ux_OP_PoC_ED)
 cor.test(Dx_SAE_Falls_0to1_Y, TotalNumOfAppt)
 
-#X_7:Serious Adverse Event - Acetaminophen
-
+#X_51:Serious Adverse Event - Acetaminophen
 
 error=rnorm(number_of_cases, 2, 10)
 xb <-   -75 + 1.5*Ux_OP_PoC_ED_730days  + error
@@ -184,7 +183,7 @@ sum(Dx_SAE_Acetaminophen_0to1_Y  )
 cor(Dx_SAE_Acetaminophen_0to1_Y, Ux_OP_PoC_ED_730days)
 summary(Dx_SAE_Acetaminophen_0to1_Y )
 
-#X_7:Serious Adverse Event - Poisoning by Sedative
+#X_53:Serious Adverse Event - Poisoning by Sedative
 error=rnorm(number_of_cases, 2, 10)
 xb <-   -36 + 0.5*Ux_OP_PoC_ED  + error
 p <- 1/(1 + exp(-xb))
@@ -195,7 +194,7 @@ cor(Dx_SAE_Sedative_0to1_Y, Ux_OP_PoC_ED)
 summary(Dx_SAE_Sedative_0to1_Y)
 
 
-#X_7: Serious Adverse Event - Vehicular Accidents
+#X_36: Serious Adverse Event - Vehicular Accidents
 error=rnorm(number_of_cases, 2, 10)
 xb <-   -28 + 0.8*Ux_OP_PoC_ED  + error
 p <- 1/(1 + exp(-xb))
@@ -205,7 +204,7 @@ sum(Dx_SAE_Vehicle_0to1_Y)
 cor(Dx_SAE_Vehicle_0to1_Y, Ux_OP_PoC_ED_730days)
 summary(Dx_SAE_Vehicle_0to1_Y)
 
-#X_7:Serious Adverse Event - Other Accidents, no correlation with other vars m = 0.002
+#X_35:Serious Adverse Event - Other Accidents, no correlation with other vars m = 0.002
 
 error=rnorm(number_of_cases, 2, 10)
 xb <-   -30 + 1.5*Ux_OP_PoC_ED  + error
@@ -217,7 +216,7 @@ sum(Dx_SAE_OtherAccident_0to1_Y)
 cor(Dx_SAE_OtherAccident_0to1_Y, Ux_OP_PoC_ED)
 
 
-#X_7:Serious Adverse Event - Poisoning by Other  m = 0.0008
+#X_52:Serious Adverse Event - Poisoning by Other  m = 0.0008
 error=rnorm(number_of_cases, 2, 10)
 xb <-   -36 + 1*Ux_OP_PoC_ED  + error
 p <- 1/(1 + exp(-xb))
@@ -227,10 +226,7 @@ summary(Dx_SAE_OtherAccident_0to1_Y)
 sum(Dx_SAE_OtherAccident_0to1_Y)
 cor(Dx_SAE_OtherAccident_0to1_Y, Ux_OP_PoC_ED)
 
-
-
-
-#X8: insomnia medication, Barbiturate, Sedative Use Disorder, binary
+#X7: insomnia medication, Barbiturate, Sedative Use Disorder, binary
 #Insomnia medications prescribed in the past 365 days, this is a random variable with binomial distribution with a probability of success of 0.0004 on each trial.
 Rx_Insomnia_0to365_D <-  rbinom(number_of_cases, 1,.0004)
 summary(Rx_Insomnia_0to365_D)
@@ -281,8 +277,6 @@ cor(MOPROB_AllAppt, Dx_SUD_CatchAll_RV2_0to1_Y)
 cor(TotalNumOfAppt, Dx_SUD_CatchAll_RV2_0to1_Y)
 
 
-
-
 #X13: Sedative Use Disorder [0.15, 0.1, 0.08] m = 0.002
 error=rnorm(number_of_cases, 2, 10)
 xb <-   -32 + 10*Dx_SUD_CatchAll_RV2_0to1_Y + 8*Dx_AlcoholUD_0to1_Y + 0.6*Ux_OP_PoC_ED + error
@@ -318,7 +312,7 @@ cor.test(Dx_Amphetamine_OtherStim_UD_0to1, Dx_SUD_CatchAll_RV2_0to1_Y)
 #variables from the STORM dataset
 ```{r storm, echo=FALSE}
 set.seed(100)
-#X25 MME  Morphine equivalent daily dose 10 months ago, continous ,  these variables are accumulative 
+#X37-48 MME  Morphine equivalent daily dose 10 months ago, continous ,  these variables are accumulative 
 c<- rbeta(number_of_cases,1,150)
 c2 <- rescale(c, to = c(0, 5000))
 Rx_Medd <- add_random_zero(c2)
@@ -354,7 +348,7 @@ error=rnorm(number_of_cases, 2, 10)
 xb <-   -22 + 35*Dx_UDS1_12m + error
 p <- 1/(1 + exp(-xb))
 
-Dx_UDS3_12m    <- rbinom(n = number_of_cases, size = 1, prob = p)
+Dx_UDS3_12m <- rbinom(n = number_of_cases, size = 1, prob = p)
 sum(Dx_UDS3_12m)
 summary(Dx_UDS3_12m)
 cor(Dx_UDS3_12m, Dx_UDS1_12m)
@@ -371,7 +365,7 @@ cor.test(Ux_RehMedPain, Rx_Medd)
 cor.test(Ux_RehMedPain, Dx_UDS1_12m)
 
 
-#X28 opioids for pain
+#X49 opioids for pain
 
 #Opioids For Pains in the past 0 to 182 days (binary) 
 error=rnorm(number_of_cases, 10, 5)
@@ -387,7 +381,7 @@ summary(Rx_OpioidForPain_0to182_D)
 cor.test(Rx_OpioidForPain_0to182_D, Ux_OP_PoC_ED_730days)
 
 
-#Opioids For Pains in the past 182 to 365 days binary  cor[0.62, 0.21] m, sd = [0.12, 0.33]
+#X50 Opioids For Pains in the past 182 to 365 days binary  cor[0.62, 0.21] m, sd = [0.12, 0.33]
 xb <-  -17 + 0.4*Rx_OpioidForPain_0to182_D  +  0.8* Ux_OP_PoC_ED  + error
 p <- 1/(1 + exp(-xb))
 
@@ -399,10 +393,8 @@ cor.test(Rx_OpioidForPain_182to365_D, Ux_OP_PoC_ED_730days)
 
 
 
-
-
-#X23 pain conditions
-#Urogenital pain
+#pain conditions
+#X26 Urogenital pain
 #not related to anything
 Dx_Pain_Urogenital_0to1_Y <- rbinom(number_of_cases, 1,.014)
 
@@ -417,7 +409,7 @@ summary(Dx_Pain_Neuropathy_0to1_Y)
 cor.test(Dx_Pain_Neuropathy_0to1_Y, Rx_OpioidForPain_182to365_D)
 cor.test(Dx_Pain_Neuropathy_0to1_Y, agegroup_ge50)
 
-# back pain
+#X24 back pain
 #midly correlated with TotalNumOfAppt 0.13- 0.18, Paton_Rx_OpioidForPain, Rx_OpioidForPain_0to182_D 0.22  m =0.22
 error=rnorm(number_of_cases, 8, 8)
 xb <-   -20  + 4*Rx_OpioidForPain_0to182_D + 3*Rx_OpioidForPain_182to365_D +  0.5*TotalNumOfAppt_730days + error
@@ -429,7 +421,7 @@ summary(Dx_Pain_Back)
 cor.test(Dx_Pain_Back, Rx_OpioidForPain_182to365_D)
 cor.test(Dx_Pain_Back, TotalNumOfAppt)
 
-#neck pain
+#X25 neck pain
 #Ux_OP_PoC_ED_730days 0.1, Rx_OpioidForPain_0to182_D 0.14, Paton_Rx_OpioidForPain 0.10, TotalNumOfAppt_91days 0.14- 0.17   m = 0.06
 error=rnorm(number_of_cases, -2, 8)
 xb <-   -19 + 2*Ux_OP_PoC_UC  + 0.5*TotalNumOfAppt   + 2.8*Rx_OpioidForPain_0to182_D + 1.8*Rx_OpioidForPain_182to365_D + error
@@ -442,7 +434,7 @@ cor.test(Dx_Pain_Neck_0to1_Y, Ux_OP_PoC_UC)
 cor.test(Dx_Pain_Neck_0to1_Y, TotalNumOfAppt)
 cor.test(Dx_Pain_Neck_0to1_Y, Rx_OpioidForPain_0to182_D)
 
-#pain
+#X27 Fibromyalgia pain
 error=rnorm(number_of_cases, 0, 5)
 xb <-   -12 + 0.05*TotalNumOfAppt + error
 p <- 1/(1 + exp(-xb))
@@ -453,13 +445,13 @@ sum(Dx_Pain_Fibromyalgia_0to1_Y)
 summary(Dx_Pain_Fibromyalgia_0to1_Y)
 cor.test(Dx_Pain_Fibromyalgia_0to1_Y, TotalNumOfAppt)
 
-#no corr with other var
+#X28 Endometriosis no corr with other var
 Dx_Endometriosis_0to1_Y <- rbinom(number_of_cases, 1,.0006)
 summary(Dx_Endometriosis_0to1_Y)
 
 
-#X24 mental illnesses
-#psychoses past year, this one is related to age (-0.14) and substance use such as alcohol(0.11) cannabis, cocaine, nicotine, depression
+# mental illnesses
+#X29 psychoses past year, this one is related to age (-0.14) and substance use such as alcohol(0.11) cannabis, cocaine, nicotine, depression
 error=rnorm(number_of_cases, 0, 2)
 xb <-   -1 + 8*Dx_AlcoholUD_0to1_Y  - 18*agegroup_ge50 - 20*agegroup_ge60  -  45*agegroup_ge70 + error
 p <- 1/(1 + exp(-xb))
@@ -470,7 +462,7 @@ summary(EH_Psychoses)
 cor.test(EH_Psychoses, Dx_AlcoholUD_0to1_Y)
 cor.test(EH_Psychoses, agegroup_ge70)
 
-#depression, correlated with alcoho, psychosis, homelessness, elixhausr drug abuse
+#X30 depression, correlated with alcoho, psychosis, homelessness, elixhausr drug abuse
 error=rnorm(number_of_cases, 0, 5)
 xb <-   -20 + 2*Dx_AlcoholUD_0to1_Y  + 27*EH_Psychoses + error
 p <- 1/(1 + exp(-xb))
@@ -483,7 +475,7 @@ cor.test(Dx_MDD_12m, EH_Psychoses)
 
 
 
-#PTSD m = 0.12
+#X31 PTSD m = 0.12
 error=rnorm(number_of_cases, 0, 5)
 xb <-   -15 + 1*Ux_OP_PoC_ED + 0.6*TotalNumOfAppt + error
 p <- 1/(1 + exp(-xb))
@@ -509,7 +501,7 @@ cor.test(Rx_Anxiolytic_0to365_D , TotalNumOfAppt)
 cor.test(Rx_Anxiolytic_0to365_D , Dx_PTSD_1to2_Y)
 
 
-#X:26 homelessness [0.16, 0.10, 0.16, 0.15, 15] m = 0.02
+#X32 homelessness [0.16, 0.10, 0.16, 0.15, 15] m = 0.02
 error=rnorm(number_of_cases, 0, 5)
 xb <-   -7 + 0.2*Ux_OP_PoC_ED + 0.02*TotalNumOfAppt + 1.5*Dx_SUD_CatchAll_RV2_0to1_Y + 1*Dx_AlcoholUD_0to1_Y + Dx_Amphetamine_OtherStim_UD_0to1
 p <- 1/(1 + exp(-xb))
@@ -525,7 +517,7 @@ cor.test(Dx_Homeless_1to2_Y, Dx_AlcoholUD_0to1_Y)
 cor.test(Dx_Homeless_1to2_Y, Dx_Amphetamine_OtherStim_UD_0to1) 
 
 
-#X27: obesity  m = 0.13  [0.17]
+#X33: obesity  m = 0.13  [0.17]
 error=rnorm(number_of_cases, 0, 5)
 xb <-   -9 + 0.3*TotalNumOfAppt + error
 p <- 1/(1 + exp(-xb))
@@ -547,7 +539,7 @@ cor.test(Dx_EH_Obesity_1to2_Y, TotalNumOfAppt)
 ```{r outcome}
 # ## build Y variable
 error=rnorm(number_of_cases, 0, 50)
-xb <- -400 +  1*Ux_OP_PoC_ED + 10*Ux_OP_PoC_UC + 30*Ux_OP_PoC_TobaccoCessation  + 3*Ux_OP_MHOC_HBPC +   3.5*TotalNumOfAppt + 195*MOPROB_AllAppt   + 3*Dx_SAE_Acetaminophen_0to1_Y  + 30*Dx_SAE_Sedative_0to1_Y + 60*Dx_SAE_Vehicle_0to1_Y  + 20*Dx_SAE_OtherAccident_0to1_Y + 30*Dx_SAE_OtherDrug_0to1_Y  + 20*Dx_SAE_Falls_0to1_Y  +   3*Rx_Insomnia_0to365_D + 35*Paton_Rx_Insomnia  + Rx_OAT_methadone_12m + Rx_OAT_buprenorphine_12m + 0.5*Rx_Anxiolytic_0to365_D +  1*Dx_SUD_CatchAll_RV2_0to1_Y + 3*Dx_SedativeUD_0to1_Y + 1*Dx_Amphetamine_OtherStim_UD_0to1 + 1*Dx_AlcoholUD_0to1_Y + 0.004*agegroup_ls30 + 28*agegroup_ge30 + 28*agegroup_ge40 + 28*agegroup_ge50 + 28*agegroup_ge60 - 30*agegroup_ge70 - 25*sex_female + 43*race_White  + 20*Dx_UDS1_12m + 20*Dx_UDS2_12m+   Dx_UDS3_12m + Ux_RehMedPain + 35*Dx_Pain_Neuropathy_0to1_Y  + 35*Dx_Pain_Back + 35*Dx_Pain_Neck_0to1_Y + 1*Dx_Pain_Urogenital_0to1_Y + 1*Dx_Pain_Fibromyalgia_0to1_Y  +  20*Dx_Endometriosis_0to1_Y + 20*Dx_MDD_12m+ 5*EH_Psychoses + 0.5*Dx_PTSD_1to2_Y  + 0.005*Rx_Medd + 0.005*Rx_Medd_10m + 0.003*Rx_Medd_11m + 0.001*Rx_Medd_1m +0.001*Rx_Medd_2m + 0.001*Rx_Medd_3m + 0.001*Rx_Medd_4m + 0.001*Rx_Medd_5m + 0.003*Rx_Medd_6m + 0.003*Rx_Medd_7m + 0.005*Rx_Medd_8m + 0.004*Rx_Medd_9m + 0.1*Dx_Homeless_1to2_Y +  0.5*Dx_EH_Obesity_1to2_Y  + 5*Rx_OpioidForPain_0to182_D + 10*Rx_OpioidForPain_182to365_D + error
+xb <- -400 +  1*Ux_OP_PoC_ED + 10*Ux_OP_PoC_UC + 30*Ux_OP_PoC_TobaccoCessation  + 3*Ux_OP_MHOC_HBPC +   3.5*TotalNumOfAppt + 195*MOPROB_AllAppt +   3*Rx_Insomnia_0to365_D + 35*Paton_Rx_Insomnia + Rx_OAT_methadone_12m + Rx_OAT_buprenorphine_12m + 0.5*Rx_Anxiolytic_0to365_D + 1*Dx_SUD_CatchAll_RV2_0to1_Y + 3*Dx_SedativeUD_0to1_Y  + 1*Dx_Amphetamine_OtherStim_UD_0to1 +  1*Dx_AlcoholUD_0to1_Y + 0.004*agegroup_ls30 + 28*agegroup_ge30 + 28*agegroup_ge40 + 28*agegroup_ge50 + 28*agegroup_ge60 - 30*agegroup_ge70   - 25*sex_female + 43*race_White + 20*Dx_UDS1_12m + 20*Dx_UDS2_12m+ Dx_UDS3_12m  +  + 35*Dx_Pain_Neuropathy_0to1_Y  + 35*Dx_Pain_Back + 35*Dx_Pain_Neck_0to1_Y + 1*Dx_Pain_Urogenital_0to1_Y + 1*Dx_Pain_Fibromyalgia_0to1_Y  +  20*Dx_Endometriosis_0to1_Y + 5*EH_Psychoses  + 20*Dx_MDD_12m + 0.5*Dx_PTSD_1to2_Y + 0.1*Dx_Homeless_1to2_Y +  0.5*Dx_EH_Obesity_1to2_Y + 20*Dx_SAE_Falls_0to1_Y + 20*Dx_SAE_OtherAccident_0to1_Y + 60*Dx_SAE_Vehicle_0to1_Y + 0.005*Rx_Medd + 0.001*Rx_Medd_1m +0.001*Rx_Medd_2m + 0.001*Rx_Medd_3m + 0.001*Rx_Medd_4m + 0.001*Rx_Medd_5m + 0.003*Rx_Medd_6m + 0.003*Rx_Medd_7m + 0.005*Rx_Medd_8m + 0.004*Rx_Medd_9m  + 0.005*Rx_Medd_10m + 0.003*Rx_Medd_11m  + 5*Rx_OpioidForPain_0to182_D + 10*Rx_OpioidForPain_182to365_D + 3*Dx_SAE_Acetaminophen_0to1_Y  + 30*Dx_SAE_OtherDrug_0to1_Y + 30*Dx_SAE_Sedative_0to1_Y  + error
 
 
 p <- 1/(1 + exp(-xb))
@@ -652,13 +644,13 @@ reduction <- function (val, redu) {
 transform_mean <- function(percent, var){
   #number of observation with y > 0
   N1 <- sum(var != 0) 
-  #new value = mean * percent that we want to reduce
+  #new value = mean * percent that we want to reduce, create a vector to be deducted by the original variable. 
   reduce  <- mean(var)*percent
   print(reduce)
-  #normalize the variable to be applid
+  #normalize the vector
   reduce_scaled <- reduce*(length(var)/N1)
   print(reduce_scaled)
-  #apply reduction function on normal
+  #apply reduction function on original variable, t
   var_new <- unlist(mapply(FUN=reduction, val=var, redu = reduce_scaled, USE.NAMES=FALSE))
   
     
