@@ -10,12 +10,11 @@ get_pareto_var <- function(location, shape, num){
   data <- round(data, digits = 0)
   
   # add some noise, the noise should be very small and doesn't affect the distribution
-  #noise <- sample(x = 0:threshold, size  = number_of_cases, replace = TRUE)
-  new_data <- data 
+  noise <- sample(x = c(0, 1, 3, 6, 8),  size  = number_of_cases, replace = TRUE, prob = c(0.995, 0.0001, 0.0001, 0.0001, 0.0001))
+  new_data <- data + noise
   return (new_data)
   
 }
-
 
 
 # 
@@ -91,7 +90,8 @@ add_counts <- function(var1, max, threshold){
 add_counts_total <- function(var1, max, first){
   #add random values to vector
   add_val <- function(x) {
-    
+    ##values bigger than threshold will have probability of.0000001 to be sampled as none 0, otherwise the probability to be non-zero is .005
+    #control the prob of having outliers
     probs = c(.9, rep(.1, first), rep(.000001, max-first))
     
     add <- sample(x = 0:max, prob = probs, size  = 1, replace = TRUE) 
@@ -102,9 +102,9 @@ add_counts_total <- function(var1, max, first){
   }
   
   new_variable <- unlist(lapply(var1, add_val))
-  print(cor(new_variable, var1))
-  print(summary(new_variable))
-  print(sd(new_variable))
+ # print(cor(new_variable, var1))
+ # print(summary(new_variable))
+  #print(sd(new_variable))
   
   return (new_variable)
   
@@ -114,63 +114,56 @@ add_counts_total <- function(var1, max, first){
 
 
 
-
-
-#getting two correlated variables with pareoto distribution for tobacco cession
-get_pareto_var_Toba <- function(location, shape, num){
-
-  data <- rpareto(num, location, shape)
-  #data[data < thres] <- 0     #convert value lower than threshold to 0
-  data <- round(data, digits = 0)
-
-  # add some noise, the noise should be very small and doesnt affect the distribution
-  noise <- sample(x = c(0, 1, 3, 6, 8, 20),  size  = number_of_cases, replace = TRUE, prob = c(0.995, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001))
-  new_data <- data + noise
-  return (new_data)
-}
-
-
-#Count of Home Based Primary Care (HBPC) stops in the last N days
+#Count of appointments  in the last N days
 #getting the referenced variable
-get_pareto_var_HBPC <- function(location, shape, num){
+# get_pareto_var_app <- function(location, shape, num){
+#   
+#   data <- rpareto(num, location, shape)
+#   data[data < 3] <- 0 
+#   data <- round(data, digits = 0)
+#   # add some noise, the noise should be very small and doesnt affect the distribution
+#   noise <- sample(x = c(0, 1, 3, 6, 8),  size  = number_of_cases, replace = TRUE, prob = c(0.999, 0.0001, 0.0001, 0.0001, 0.0001))
+#   new_data <- data + noise
+#   return (new_data)
+# }
 
-  data <- rpareto(num, location, shape)
-  data[data < 2] <- 0     #convert value lower than threshold to 0
-  data <- round(data, digits = 0)
-  # add some noise, the noise should be very small and doesnt affect the distribution
-  noise <- sample(x = c(0, 1, 3, 6, 8),  size  = number_of_cases, replace = TRUE, prob = c(0.999, 0.0001, 0.0001, 0.0001, 0.0001))
-  new_data <- data + noise
-  return (new_data)
+
+#adding random zero to the vector
+add_random_zero <- function(var1){
+  #add zeros to vector
+  add_zero <- function(x) {
+    add <- sample(c(0, 1), size = 1, replace = TRUE, prob = c(0.99, 0.01))
+    new_va <- x * add
+    return (new_va)
+  }
+  
+  new_variable <- unlist(lapply(var1, add_zero))
+  print(summary(new_variable))
+  return (new_variable)
+  
 }
-
-
 
 
 add_Medd <- function(var1, probs, max_rand){
   #add random values to vector
   add_val <- function(x) {
-
-    random_add <- runif(1, min=0, max=max_rand)
+    
+    #generate a random number
+    random_add <- runif(1, min=-3000, max=max_rand)
+    #sample a number according to probabilities 
     add <- sample(c(0, random_add), size = 1, replace = TRUE, prob = probs)
+    #adding the new number to the original value
     new_va <- x + add
+    
+    if (new_va < 0){
+      return (0)
+    }
     return (new_va)
 
   }
 
-
-  #add zeros to vector
-  reduce <- function(x) {
-    random_reduce <- runif(1, min=0, max=3000)
-    reduce <- sample(c(0, random_reduce), size = 1, replace = TRUE, prob = probs)
-    new_va <- x - reduce
-    if (new_va < 0){
-      return (0)
-    }
-    else {return (new_va)}
-  }
-
   new_variable <- unlist(lapply(var1, add_val))
-  new_variable <- unlist(lapply(new_variable, reduce))
+  #new_variable <- unlist(lapply(new_variable, reduce))
   print(summary(new_variable))
   print(cor.test(var1, new_variable))
 
