@@ -1,0 +1,150 @@
+---
+title: "result graph"
+output: html_document
+date: '2023-04-20'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(ggplot2)
+require(cowplot) 
+require(tibble)
+require(data.table)
+```
+
+## plot general performance
+
+
+```{r general_performance}
+results <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result.csv')
+
+#plotting the results
+plot_graph <- function(grouped_df, x_label, n) { 
+  
+  #x_label: label for a-axis, n: number of experiments for a model 
+   
+  #concatenate two string columns into one column
+ # grouped_df$category <- paste0(grouped_df$weighted, '_', grouped_df$feature_set)
+  
+  #get plot
+  
+  # set desired dodge width
+  pd <- position_dodge(width = 0.4) 
+  my_plot <-ggplot(grouped_df, aes(x= feature_set, y=mean, color= weighted)) +
+    geom_point(position=pd)+
+    #here we calculate the confidence interval for a mean 
+    #geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,
+                  #position=position_dodge(0.05)) +
+  
+    geom_errorbar(aes(ymin=mean-qt(0.975,df=n-1)*sd/sqrt(n), ymax=mean+qt(0.975,df=n-1)*sd/sqrt(n)), width=.2,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('score') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12))
+
+  return(my_plot)
+  
+}
+ 
+#group results according to whether the loss is weighted and feature sets, then we take the mean and sd of the results in each group 
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(precision), funs(mean, sd)) %>% add_column(evaluation = "precision") %>% as.data.frame()  -> precision_df
+
+#use the grouped df to plot results  
+#precision <- plot_graph(precision_df, 'Precision')
+
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(recall), funs(mean, sd)) %>% add_column(evaluation = "recall") %>% as.data.frame()  -> recall_df
+
+#recall <- plot_graph(recall_df, 'Recall')
+
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(f1), funs(mean, sd)) %>% add_column(evaluation = "f1") %>% as.data.frame()  -> f1_df
+
+
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(TPR), funs(mean, sd)) %>% add_column(evaluation = "TPR") %>% as.data.frame()  -> TPR_df
+
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(FPR), funs(mean, sd)) %>% add_column(evaluation = "FPR") %>% as.data.frame()  -> FPR_df
+
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(PPV), funs(mean, sd)) %>% add_column(evaluation = "PPV") %>% as.data.frame()  -> PPV_df
+
+results %>%
+    group_by(weighted, feature_set) %>%
+    summarise_at(vars(accuracy), funs(mean, sd)) %>% add_column(evaluation = "accuracy") %>% as.data.frame()  -> accuracy_df
+
+
+#joining dfs
+all_df <- rbind(precision_df, recall_df)
+all_df <- rbind(all_df, f1_df)
+all_df <- rbind(all_df, TPR_df)
+all_df <- rbind(all_df, FPR_df)
+all_df <- rbind(all_df, PPV_df)
+#all_df <- rbind(all_df, accuracy_df)
+
+#plot charts
+p <- plot_graph(all_df, 'Evaluation', 10)
+p + facet_grid(cols = vars(evaluation))
+
+```
+
+## Plotting group performance from logistics regression, adjusted loss
+
+```{r group_performance, echo=FALSE}
+#organize data for plots
+
+get_group_fair_df <- function(x){
+   
+    #select group evaluation result variables to form a long table
+    results <- results[,c(3, 15:62)]
+    results_long <- melt(setDT(results), id.vars = c("weighted"), variable.name = "group_metrics")
+        
+    results_long  %>%
+        group_by(group_metrics, weighted) %>%
+        summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> group_fair_df
+    
+   # define two columns that indicate the metric name and the group name 
+    group_fair_df$metric_names <- unlist(lapply(as.character(group_fair_df$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][1])))
+    group_fair_df$group_names  <- unlist(lapply(as.character(group_fair_df$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][2])))
+    
+  #return a data frame with group evaluation results and group name variables 
+  return(group_fair_df)
+  
+}
+
+
+plot_group <- function(grouped_df, x_label, n) {
+  
+    #get plot
+    pd <- position_dodge(width = 0.4) #set dodge width
+    my_plot <-ggplot(grouped_df, aes(x= group_names, y=mean, color=weighted)) +
+    geom_point(position=pd)+
+    geom_errorbar(aes(ymin=mean-qt(0.975,df=n-1)*sd/sqrt(n), ymax=mean+qt(0.975,df=n-1)*sd/sqrt(n)), width=.2,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('score') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12))
+
+  return(my_plot)
+  
+}
+
+group_fair_df <- get_group_fair_df('unweighted')
+
+group_evaluation <- plot_group(group_fair_df, 'group_metrics', 10)
+
+#should plot both groups on the same grid
+group_evaluation + facet_grid(cols = vars(metric_names))
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
