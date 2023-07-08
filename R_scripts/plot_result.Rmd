@@ -1,0 +1,405 @@
+---
+title: "plot_result"
+output: html_document
+date: '2023-06-09'
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(ggplot2)
+require(cowplot) 
+require(tibble)
+require(data.table)
+library(forcats) #reorder factor levels
+require(dplyr)
+```
+
+
+## plot general performance
+This block plot the model performace of the logisitic regressions 
+
+```{r general}
+results_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted.csv')
+results_non_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_nonweighted.csv', row.names = NULL)
+
+#get KS score mean
+mean(results_weighted$ks_score)
+mean(results_non_weighted$ks_score)
+
+#results_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/data/test_result_weighted_500.csv')
+#results_non_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/data/test_result_nonweighted_500.csv', row.names = NULL)
+
+#select column: weight, feature_set and all the evaluation metric results
+select_columns <- function(file, columns){
+  new_file <- file[,columns]
+  return (new_file)
+}
+
+results_weighted_clean <- select_columns(results_weighted, c(3:10,14:69))
+results_non_weighted_clean <-  select_columns(results_non_weighted, c(3:10,14:69))
+
+#combine result tables 
+results <- rbind(results_weighted_clean, results_non_weighted_clean)
+
+#groupby weight, feature set, compute mean, sd of each evaluation metric
+get_mean_sd <- function(metric, file){
+  #metric: metric name, col_num: var_column, file: processed file with selected columns
+  
+  file %>%
+      group_by(weighted, feature_set) %>%
+      summarise_at(c(metric), funs(mean, sd)) %>% add_column(evaluation = metric) %>% as.data.frame()  -> df
+  
+  return (df)
+  
+}
+  
+f1_df <- get_mean_sd('f1',  results)
+TPR_df <- get_mean_sd('TPR',  results)
+FPR_df <- get_mean_sd('FPR', results)
+PPV_df <- get_mean_sd('PPV', results)
+accuracy_df <- get_mean_sd('accuracy', results)
+
+#combine all the grouped result metrics
+all_df <- rbind(TPR_df, f1_df)
+all_df <- rbind(all_df, FPR_df)
+all_df <- rbind(all_df, PPV_df)
+
+plot_graph <- function(grouped_df, x_label) { 
+  
+  #x_label: label for a-axis, n: number of experiments for a model 
+  #get plot
+  
+  # set desired dodge width
+  pd <- position_dodge(width = 0.4) 
+  my_plot <-ggplot(grouped_df, aes(x= feature_set, y=mean, color= weighted)) +
+    geom_point(position=pd)+
+    #here we calculate the confidence interval for a mean 
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('Score') +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12), axis.text = element_text(size= 12),  axis.title = element_text(size= 12), strip.text = element_text(size = 12), legend.position = "top", legend.text=element_text(size=12)) + 
+    facet_grid(cols = vars(evaluation)) +
+    labs(color="Loss Function Type")
+  
+  
+
+
+  return(my_plot)
+  
+}
+
+#plot charts
+p <- plot_graph(all_df, 'Feature Sets')
+p 
+
+
+```
+
+#plot feature sets and group performance
+
+You can also embed plots, for example:
+
+```{r group, echo=FALSE}
+
+#generate df for plotting
+get_group_result <- function(which_fea_set, file) {
+  
+  
+  #get a df contain results of a particular feature set, here we only use the weighted algorithm
+    results_fea1 <- file[file$weighted == 'weighted' & file$feature_set == which_fea_set,]
+    #select group metrics only 
+    results_fea1 <- results_fea1[, 11:64]
+    results_fea_id <- results_fea1 %>% mutate(id = row_number())
+    
+    #create a table with id, group_metric
+    results_long <- melt(setDT(results_fea_id), id.vars = c("id"), variable.name = "group_metrics")
+    # 
+    # #get mean, sd from the table
+    results_long  %>%
+            group_by(group_metrics) %>%
+            summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> group_fair_df2
+
+    group_fair_df2$feature_set <- which_fea_set
+
+    group_fair_df2$metric_names <- unlist(lapply(as.character(group_fair_df2$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][1])))
+    group_fair_df2$group_names  <- unlist(lapply(as.character(group_fair_df2$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][2])))
+
+    # add a column to define complimented/ marginalized groups
+    complementary  <- group_fair_df2[grepl('no', group_fair_df2$group_names), ]
+    sensitive_grp <-setdiff(group_fair_df2, complementary)
+    complementary$group_type <- 'complementary'
+    sensitive_grp$group_type <- 'marginalized'
+    
+
+    com_sen_df <- rbind(complementary, sensitive_grp)
+    com_sen_df$group_type[com_sen_df$group_name == 'male'] <- 'complementary'
+    com_sen_df$group_type[com_sen_df$group_name == 'White'] <- 'complementary'
+    com_sen_df$group_type[com_sen_df$group_name == 'nonWhite'] <- 'marginalized'
+    
+    #add general performance, later we'll draw a line for the general performance of the model 
+    com_sen_df$general_performance[com_sen_df$metric_names == "TPR"]  <- mean(com_sen_df[com_sen_df$metric_names == "TPR",]$mean, na.rm=TRUE)
+    com_sen_df$general_performance[com_sen_df$metric_names == "FPR"]  <- mean(com_sen_df[com_sen_df$metric_names == "FPR",]$mean, na.rm=TRUE)
+    com_sen_df$general_performance[com_sen_df$metric_names == "PPV"]  <- mean(com_sen_df[com_sen_df$metric_names == "PPV",]$mean, na.rm=TRUE)    
+    
+    #recode group name so that x axis only shows marginalized group as names 
+    com_sen_df %>% mutate(group_names=recode(group_names, "backpain" = "Back pain", "neckpain"= "Neck pain",  "nonNeckpain"= "Neck pain", 'White'='non-White', 'nonWhite' = 'non-White', "nonBackpain" = "Back pain", "nonNeckpain" = "Neck pain", "nonNeuropathy"="Neuropathy" ,"noFibromyalgia"= "Fibromyalgia",  "noPTSD"= "PTSD", "noMDD"= "MDD",  "noHomeless"= "Homeless", "male" = 'Female', 'female' = 'Female')) -> com_sen_df
+        
+   return(com_sen_df)
+  
+}
+
+
+com_sen_df_set1 <- get_group_result('set1', results)
+com_sen_df_set2 <- get_group_result('set2', results)
+
+all  <- rbind(com_sen_df_set1,com_sen_df_set2)
+
+plot_group_feature <- function(grouped_df, x_label) {
+  
+    #get plot
+    pd <- position_dodge(width = 0.5) #set dodge width
+    my_plot <-ggplot(grouped_df, aes(x= group_names, y=mean, color=group_type)) +
+    geom_point(position=pd)+
+    
+    #confidence interval of mean  
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('score') +
+    #facet_grid(cols = vars(metric_names)) +
+    facet_grid(cols = vars(metric_names), rows = vars(feature_set)) + theme_bw() +
+    geom_hline(data = grouped_df, aes(yintercept = general_performance), linetype = 'dashed', color ='red') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12), axis.text = element_text(size= 12),  axis.title = element_text(size= 12), legend.position = "top", strip.text = element_text(size = 12), legend.text=element_text(size=12)) + labs(color="Group Type") + xlab("Group Metrics") + ylab("Score")
+
+  return(my_plot)
+  
+}
+
+plot_group_feature(all, 'group_metrics')
+
+
+#com_sen_df_reordered  <-  com_sen_df_set1 %>% mutate(group_names=recode(group_names, "backpain" = "Backpain", "neckpain"= "Neckpain",  "nonNeckpain"= "Neckpain", 'White'='nonWhite', "nonBackpain" = "Backpain", "nonNeckpain" = "Neckpain", "nonNeuropathy"="Neuropathy" ,"noFibromyalgia"= "Fibromyalgia",  "noPTSD"= "PTSD", "noMDD"= "MDD",  "noHomeless"= "Homeless", "male" = 'female'))
+
+#group_evaluation_set1 <- plot_group_feature(com_sen_df_set1, 'group_metrics')
+#group_evaluation_set1
+#group_evaluation_set2 <- plot_group_feature(com_sen_df_set2, 'group_metrics')
+#group_evaluation_set2
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+#plot shifted data performance
+```{r group_shift}
+
+##plot group performance 
+
+get_shifted_group_df <- function(file){
+   #generate a df for plotting shifted model group performance
+  
+  
+    #select group evaluation result variables to form a long table
+    file <- file[,c(15:63)]
+    results_long <- melt(setDT(file), id.vars = c("shifted"), variable.name = "group_metrics")
+        
+    results_long  %>%
+        group_by(group_metrics, shifted) %>%
+        summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> shifted_plot_df
+    
+   # define two columns that indicate the metric name and the group name 
+    shifted_plot_df$metric_names <- unlist(lapply(as.character(shifted_plot_df$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][1])))
+    shifted_plot_df$group_names  <- unlist(lapply(as.character(shifted_plot_df$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][2])))
+    
+  #return a data frame with group evaluation results and group name variables 
+  return(shifted_plot_df)
+  
+}
+
+
+
+plot_group_shift_group <- function(grouped_df, x_label) {
+  
+    #get plot
+    pd <- position_dodge(width = 0.8) #set dodge width
+    my_plot <-ggplot(grouped_df, aes(x= group_names, y=mean, color=shifted)) +
+    geom_point(position=pd)+
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('score') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12))
+
+  return(my_plot)
+  
+}
+
+
+
+shifted_group_df <- get_shifted_group_df(combined_results)
+
+#recode group names so that they look nice on the graph
+shifted_group_df_reordered  <- shifted_group_df  %>% mutate(group_names=recode(group_names, "backpain" = "Backpain", "neckpain"= "Neckpain", 'nonWhite'='White_N', "nonBackpain" = "Backpain_N", "nonNeckpain" = "Neckpain_N", "nonNeuropathy"="Neuropathy_N" ,"noFibromyalgia"= "Fibromyalgia_N",  "noPTSD"= "PTSD_N", "noMDD"= "MDD_N",  "noHomeless"= "Homeless_N"))
+
+
+
+shift_evaluation_grp <- plot_group_shift_group(shifted_group_df_reordered, 'group_names')
+
+
+#should plot both groups on the same grid
+shift_evaluation_grp + facet_grid(cols = vars(metric_names))
+
+```
+
+
+```{r datashift, echo=FALSE}
+#read results of data shift models
+
+results_weighted5 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift5.csv')
+results_weighted10 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift10.csv')
+results_weighted20 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift20.csv')
+results_weighted30 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift30.csv')
+
+
+#select results from non shifted model 
+#results_weighted_only <- results[results$weighted == 'weighted',] 
+results_weighted$shifted <- 'no_shift'
+
+#combinig all the results tables
+combined_results <- rbind(results_weighted5, results_weighted10)
+combined_results <- rbind(combined_results, results_weighted20)
+combined_results <- rbind(combined_results, results_weighted30)
+combined_results <- rbind(combined_results, results_weighted)
+
+#select feature set 1 only
+combined_results <- combined_results[combined_results$feature_set == 'set1',]
+
+#
+combined_results <- combined_results  %>% mutate(shifted=recode(shifted, "5" = "shifted1", "10"= "shifted2", "20"= "shifted3", "30"= "shifted4"))
+
+#plot general model performance
+get_shifted_model_df <- function(file){
+   #for general results
+    #select group evaluation result variables to form a long table
+    file <- file[,c(6:10, 70)]
+    results_long <- melt(setDT(file), id.vars = c("shifted"), variable.name = "group_metrics")
+
+    results_long  %>%
+        group_by(group_metrics, shifted) %>%
+        summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> shifted_plot_df
+
+  #return a data frame with group evaluation results and group name variables 
+  return(shifted_plot_df)
+  
+}
+
+#file <- combined_results
+#file <- file[,c(4:10, 63)]
+#results_long2 <- melt(setDT(file), id.vars = c("shifted"), variable.name = "group_metrics")
+
+#results_long2  %>%
+        #group_by(group_metrics, shifted) %>%
+        #summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> shifted_plot_df
+
+
+shifted_plot_df <- get_shifted_model_df(combined_results)
+
+
+plot_group_shift_general <- function(grouped_df, x_label) {
+  
+    #get plot
+    pd <- position_dodge(width = 0.5) #set dodge width
+    my_plot <-ggplot(grouped_df, aes(x= group_metrics, y=mean, color=shifted)) +
+    geom_point(position=pd, size= 2)+
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.3,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('score') + theme_bw() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 14), axis.text.y = element_text(size= 14), axis.title = element_text(size = 14), legend.text=element_text(size=12)) + ylab("Score") + xlab("Metrics")
+
+  return(my_plot)
+  
+}
+
+#plot general performance
+plot_group_shift_general(shifted_plot_df, 'shifted_models')
+
+```
+
+
+
+#rescale score and compare with MEDD
+```{r plot_compare, echo=FALSE}
+probFile_nw <- read.csv("/Users/luciachen/Dropbox/simulated_data/results/prob_plot.csv")
+probFile_w <- read.csv("/Users/luciachen/Dropbox/simulated_data/results/prob_plot_weighted.csv")
+
+
+plot_compare_scores<- function(File){
+  
+      y_probs <- File$positive_class
+      y_test <- File$Dx_OpioidOverdose_0to1_Y
+      Medd <- File$Rx_Medd
+      #Task 2:  produce the plot that compares overdose and non-overdoes observations in each bin
+      #rescale prediction probabilty to a range of 0 - 990
+      rescaled_scores <- rescale(y_probs, to=c(0, 990))
+      summary(rescaled_scores)
+      # form a table (compare.csv) that contains the rescaled scores, prediction probability, outcome and Medd
+      compare <- data.frame(rescaled_scores, y_probs, y_test, Medd)
+      colnames(compare) <- c('rescaled_scores', 'y_probs', 'Dx_OpioidOverdose_0to1_Y', 'Rx_Medd')
+      #write.csv(compare, "/Users/luciachen/Dropbox/simulated_data/results/compare_scores.csv")
+      
+      
+      #Read compare.csv
+      #compare <- read.csv("/Users/luciachen/Dropbox/simulated_data/results/compare_scores.csv")
+      compare$rescaled_scores <- round(compare$rescaled_scores) #round up the scores
+      
+      #bin the scores according to threshold, NarxCare defined these bins on the White Paper, this function returns the points bin
+      binned <- compare %>% mutate(points_bin = cut(rescaled_scores, breaks=c(0, 50, 100, 150, 200, 250,  300, 350, 400, 450, 500, 550, 600, 650, 700,750, 800, 850, 900, 950, 1000)))
+      
+      
+      #Here we plot overdose and non-overdose observations in each bin
+      #get sum of overdose observations in each bin
+      overdose_bins_cul <- aggregate(Dx_OpioidOverdose_0to1_Y ~ points_bin, binned, sum)
+      
+      #to get the sum of non-overdose observation, we revert the coding, turn 1 to 0 and 0 to 1 then aggregate the count
+      binned$recoded_y <- -1 * (compare$Dx_OpioidOverdose_0to1_Y - 1) 
+      overdose_bins_cul_zero <- aggregate(recoded_y ~ points_bin, binned, sum)
+      
+      #getting the percentage of overdose and non-overdose in each bin
+      overdose_bins_cul$percentage <- overdose_bins_cul$Dx_OpioidOverdose_0to1_Y / sum(overdose_bins_cul$Dx_OpioidOverdose_0to1_Y)
+      overdose_bins_cul_zero$percentage <- overdose_bins_cul_zero$recoded_y / sum(overdose_bins_cul_zero$recoded_y)
+      
+      overdose_bins_cul$group <- 'overdose'
+      overdose_bins_cul_zero$group <-'non-overdose'
+      
+      #put all the columns together to form a table for the plotting
+      overdose <- data.frame(overdose_bins_cul$percentage, overdose_bins_cul$points_bin, overdose_bins_cul$group)
+      colnames(overdose) <- c('percentage', 'points_bin', 'group')
+      non_overdose<- data.frame(overdose_bins_cul_zero$percentage, overdose_bins_cul_zero$points_bin, overdose_bins_cul_zero$group)
+      colnames(non_overdose) <- c('percentage', 'points_bin', 'group')
+      
+      bar_chart_df <- rbind(overdose, non_overdose)
+      
+      return(bar_chart_df)
+      
+}
+
+bar_chart_df_weighted <- plot_compare_scores(probFile_w)
+bar_chart_df_nonweighted <- plot_compare_scores(probFile_nw)
+
+#plot the table
+compare_w <- ggplot(bar_chart_df_weighted, aes(points_bin, percentage)) +   
+  geom_bar(aes(fill = group), position = "dodge", stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5, size = 14), axis.text.y = element_text(size = 14), axis.title.y = element_text(size = 16), legend.text=element_text(size=12), axis.title.x = element_blank(), legend.position = "none") +  scale_fill_manual(values=c("#2B3467", "#EB455F"))
+
+compare_nw <- ggplot(bar_chart_df_nonweighted, aes(points_bin, percentage)) +   
+  geom_bar(aes(fill = group), position = "dodge", stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5, size = 14), axis.text.y = element_text(size = 14), axis.title.y = element_text(size = 16), legend.text=element_text(size=12), axis.title.x = element_blank(), legend.position = c(0.8,0.8)) +  scale_fill_manual(values=c("#2B3467", "#EB455F"))
+
+
+plot_grid(compare_w, compare_nw, labels = "AUTO")
+
+```
+
