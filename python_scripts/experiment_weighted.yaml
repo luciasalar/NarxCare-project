@@ -1,0 +1,19 @@
+features:
+    set1: ['TobaccoCessation', 'Ux', 'Insomnia', "Dx","MOPROB", "age", "sex", "race", "Rx"] #Ux denotes the hospital visits, Rx denote drug use, Dx denote serious events, 
+    set2: ['TobaccoCessation', 'Ux', 'Insomnia', "Dx","MOPROB", "age", "sex", "race", "Rx", "MH", "EH", "PA"] #include "MH" mental health, "EH" other conditon, "PA" pain conditions
+
+experiment:
+
+    sklearn.linear_model.LogisticRegression:
+        clf__classifier__penalty: ['none']   #
+        #clf__classifier__C: [0.1]   #this doesn't matter since we don't use penalty
+        #clf__classifier__random_state: [300]  #set random state
+        clf__classifier__n_jobs: [-1]   #set number of cpus 
+        clf__classifier__max_iter: [10000] #number of max iteration
+        ## class_weight is a dictionary that defines each class label (e.g. 0 and 1) and the weighting to apply in the calculation of the negative log likelihood when fitting the model.
+        #clf__classifier__class_weight: [0:0.976, 1:0.024] #the dictionary refers to class label: weight, here the inverse probability of class 0 is 10, class 1 is 1
+        clf__classifier__class_weight: [{0: 0.94, 1: 0.06}]  #there needs to be a space in between key and value!!!
+
+
+
+

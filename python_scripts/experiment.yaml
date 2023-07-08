@@ -1,0 +1,13 @@
+features:
+    set1: ['TobaccoCessation', 'Ux', 'Insomnia', "Dx","MOPROB", "age", "sex", "race", "Rx"] #Ux denotes the hospital visits, Rx denote drug use, Dx denote serious events, 
+    set2: ['TobaccoCessation', 'Ux', 'Insomnia', "Dx","MOPROB", "age", "sex", "race", "Rx", "MH", "EH", "PA"] #include "MH" mental health, "EH" other conditon, "PA" pain conditions
+
+experiment:
+    sklearn.linear_model.LogisticRegression:
+        clf__classifier__penalty: ['none']   #
+        clf__classifier__n_jobs: [-1]   #set number of cpus 
+        clf__classifier__max_iter: [10000] #number of max iteration
+      
+
+
+
