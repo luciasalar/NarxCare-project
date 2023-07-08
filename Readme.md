@@ -18,11 +18,12 @@ Python: pandas, numpy, sklearn, re, typing (for type setting), ruamel (for yaml 
 1. experiment_weighted.yaml: setting parameters for model with weighted loss function
 2. experiment.yaml: setting parameters 
 
-## Simulated Data (Folder, in a separate dropbox link):
+#### model files
 1. training_models_weighted_shifted.py: model with weighted loss function and shifted data
 2. training_models_weighted.py: model with weighted loss function
 3. training_models.py: model with non-weighted loss function
 
+## Simulated Data (Folder, in a separate dropbox link):
 
 ## How to run the model file:
 
