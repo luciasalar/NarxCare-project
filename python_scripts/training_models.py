@@ -23,13 +23,11 @@ import glob
 import os
 import random
 
-#write down what does each trunk of code do 
 
 def load_experiment(path_to_experiment):
-	#load experiment 
+	#load experiment parameters from the yaml file
 	data = yaml.safe_load(open(path_to_experiment))
 	return data
-
 
 
 class PreprocessData:
@@ -40,17 +38,22 @@ class PreprocessData:
 
 	def get_cohorts(self):
 		'''
-		Get case-control cohort 
+		Get case-control cohort:
+		Select all the positive cases (N) and randomly select negative cases (N x 100) to form a cohort for each experiment 
+		output: dataframe
 		'''
-		data = pd.read_csv(self.data_path + "data/simulated_data_big_sample.csv")
 
+		#load dataset
+		data = pd.read_csv(self.data_path + "simulated_data_big_sample_shuffled_outcome.csv")
+        
+		#select positive and negative cases
 		positive = data.loc[data['Dx_OpioidOverdose_0to1_Y'] == 1]
 		negative = data.loc[data['Dx_OpioidOverdose_0to1_Y'] == 0]
 		
 		#select 100 negative observations for every positive observations 
 		negative_cohort = negative.sample(n=positive.shape[0]*100, random_state=random.randint(0,10000))
 
-		#combine all the cohorts
+		#combine the negative and positive cases
 		case_control_cohort = pd.concat([positive,negative_cohort])
 
 		return case_control_cohort
@@ -58,6 +61,7 @@ class PreprocessData:
 
 	def pre_process(self): 
 		"""
+		preprocessing:
 		create feature matrix and outcome variable
 		output: feature matrix X, outcome y as a vector
 		"""
@@ -69,7 +73,7 @@ class PreprocessData:
 		return X, y
 
 	def get_train_test_split(self):
-		''' split train test 8:2, stratify splittin
+		''' split train test 0.75:0.25, stratify splitting
 		output: X train / test feature matrix, y train/test outcome
 		'''
 		#get feature matrix and outcome variable
@@ -119,6 +123,7 @@ class Training:
 		self.X_test = X_test #test feature
 		self.y_test = y_test #test outcome
 		self.parameters = parameters #parameters, see experiment.yaml
+		#self.path = "/Users/luciachen/Dropbox/simulated_data/" #path for the simulated dataset
 		self.label = 'Dx_OpioidOverdose_0to1_Y'#outcome 
 		self.features_list = features_list #list of features included in training, see experiment.yaml
 
@@ -185,7 +190,8 @@ class Training:
 		#calculate recall: TPR
 		try:
 			TN = CM[0][0]
-		except IndexError:
+		# 0 is not appended to the matrix, causing an index erorr when we select the slot, here we put 0 back when there's index error
+		except IndexError: 
 			TN = 0 
 
 		try:	
@@ -220,6 +226,8 @@ class Training:
 			PPV = TP / (TP + FP)
 		else:
 			PPV = None
+
+		#print(TN, FN, TP, FP)
 
 		return TPR, FPR, PPV
 		
@@ -258,9 +266,6 @@ class Training:
 		https://towardsdatascience.com/evaluating-classification-models-with-kolmogorov-smirnov-ks-test-e211025f5573
 
 		"""
-		#X_1 = X_test.loc[X_test[group_name] == 1]
-		#X_0 = X_test.loc[X_test[group_name] == 0]
-
 		#merge feature set with outcome in test set
 		all_test = pd.concat([X_test.reset_index(drop=True), y_test.reset_index(drop=True)], axis=1)
 		print(all_test.columns)
@@ -325,12 +330,12 @@ class Training:
 
 
 #preprocess data, get train, test and outcome
-path = '/Users/luciachen/Dropbox/simulated_data/' #change path in here
-#path = '/home/groups/sherrir/luciachn/simulated_data/'
-file_number = 'nonweighted'
+#path = '/Users/luciachen/Dropbox/simulated_data/' #change path in here!!
+path = '/home/groups/sherrir/luciachn/simulated_data/'
+file_number = 'nonweighted_shuffled' #change the file name here !!
 
 
-experiment = load_experiment(path + 'source/Python/experiment.yaml')
+experiment = load_experiment(path + 'experiment.yaml')
 
 #store results
 file_exists = os.path.isfile(path + 'results/test_result_{}.csv'.format(file_number)) #remember to create a results folder
@@ -391,7 +396,6 @@ while i < 500: #set the number of times we run the experiments
 			TPR_PTSD, FPR_PTSD, PPV_PTSD, TPR_noPTSD, FPR_noPTSD, PPV_noPTSD= train.get_group_evaluation('MH_PTSD_1to2_Y', y_pred, X_test) #PTSD
 			TPR_MDD, FPR_MDD, PPV_MDD, TPR_noMDD, FPR_noMDD, PPV_noMDD= train.get_group_evaluation('MH_MDD_12m', y_pred, X_test) #MDD
 			TPR_Homeless, FPR_Homeless, PPV_Homeless, TPR_noHomeless, FPR_noHomeless, PPV_noHomeless= train.get_group_evaluation('EH_Homeless_1to2_Y', y_pred, X_test) #Homelessness
-
 			
 
 			#combine the result columns: grid search best score, best parameters, weighted loss (TRUE/FALSE) classification report, log loss, experiment time, classifier, feature set, log loss of sensitive groups
@@ -404,7 +408,7 @@ while i < 500: #set the number of times we run the experiments
 			writer_top.writerows(result_row)
 
 			f.close()
-			gc.collect()
+			gc.collect() #garbage collection
 
 	i += 1
 
