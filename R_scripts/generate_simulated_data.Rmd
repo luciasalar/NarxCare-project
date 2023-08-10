@@ -16,34 +16,46 @@ require(scales)
 library(dplyr)
 library(tidyr)
 
-#import functions
-source('/Users/luciachen/Dropbox/simulated_data/source/R/simulated_data_functions.R')
+#import functions to generate simulated data
+source('/Users/luciachen/Dropbox/simulated_data/source/R_scripts/simulated_data_functions.R')
 ```
 
-## Creating hospital visit count variables
-These variables are hospital visit counts, and they are continuous, overlapped and highly correlated. We first created a reference variable using different types of distribution, and then we added random counts to the reference variable so that the succeeding variable is correlated with the preceding variable. We added higher counts to observations with more visits so that the variable in the next time state is highly correlated with the preceding one. Observations with counts > threshold will be added to more counts 
+# Introduction
+This file generates a simulated dataset with 2,000,000 observations. It contains 52 independent variables and 1 binary dependent variable, which represents an overdose incident in the past year. The variables are documented in Table 1: Proxy variables from VA in comparison with PDMP variables (Draft).
 
-Pareoto variable: https://search.r-project.org/CRAN/refmans/EnvStats/html/
+Notations: 
+- m: mean
+- sd: standard deviation
+
+Variables with functional forms and binomial distribution are all described in Table 3 (Draft)
+Process of generating `Redd` is described in the last the paragragh of section 4.2 (Draft)
 
 Functions in this script are at simulated_data_functions_final.R
 
-Section 4.2 on the draft
 ```{r demographic}
-#X17: Age variables were indicators: less than 30, 30-39, 40-49, 50-59, 60-69, and above 70.  We generated age using a normal distribution ($m$ = 60, $sd$ = 14.5) with upper and lower bounds (20, 100). Then the normal distribution was converted into groups of indicator variables.
+#X17: Age variables were indicators: less than 30, 30-39, 40-49, 50-59, 60-69, and above 70.  We generated age using a normal distribution (m = 60, $sd$ = 14.5) with upper and lower bounds (20, 100). Then the normal distribution was converted into groups of indicator variables.
 
 set.seed(100)
-num_of_obs = 200
-#We generated age using a normal distribution (m = 60, sd = 14.5) with upper and lower bounds (20, 100) and converted it to groups of indicator variables. 
+num_of_obs = 100000
+#Generate age using a normal distribution (m = 60, sd = 14.5)
+#The age distribution is truncated to have a lower bound of 20 and an upper bound of 100
 age <- rtruncnorm(n=num_of_obs, a=20, b=100, mean=60, sd=14.5)
 
-# Then the normal distribution is converted into groups of indicator variables.
+# Convert age into groups of indicator variables
+# agegroup_ls30 is 1 if the age is less than 30, 0 otherwise
 agegroup_ls30 <- ifelse(age < 30, 1, 0)
+# agegroup_ge30 is 1 if the age is between 30 and 40, 0 otherwise
 agegroup_ge30 <- ifelse(age >= 30 & age < 40, 1, 0)
+# agegroup_ge40 is 1 if the age is between 40 and 50, 0 otherwise
 agegroup_ge40 <- ifelse(age >= 40 & age < 50, 1, 0)
+# agegroup_ge50 is 1 if the age is between 50 and 60, 0 otherwise
 agegroup_ge50 <- ifelse(age >= 50 & age < 60, 1, 0)
+# agegroup_ge60 is 1 if the age is between 60 and 70, 0 otherwise
 agegroup_ge60 <- ifelse(age >= 60 & age < 70, 1, 0)
+# agegroup_ge70 is 1 if the age is 70 or older, 0 otherwise
 agegroup_ge70 <- ifelse(age >= 70, 1, 0)
 
+# Inspect summary statistics and standard deviation of each age group
 summary(agegroup_ls30)
 sd(agegroup_ls30)
 summary(agegroup_ge30)
@@ -57,15 +69,22 @@ sd(agegroup_ge60)
 summary(agegroup_ge70)
 sd(agegroup_ge70)
 
+# Inspect correlation between groups
 cor(agegroup_ge30, agegroup_ge60)
 
-#X15: gender [m = 0.0006]
+#X15: gender (VA: m = 0.08, sd = 0.28)
+# Generate random errors  (m = 0, sd = 5) using normal distribution
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -322 + 320*agegroup_ls30  + 320*agegroup_ge30  + 320*agegroup_ge40 + 120*agegroup_ge50 - 560*agegroup_ge60  -  680*agegroup_ge70 +  error
-p <- 1/(1 + exp(-xb))
+# Calculate linear predictor values for target variable 
+female <-   -322 + 320*agegroup_ls30  + 320*agegroup_ge30  + 320*agegroup_ge40 + 120*agegroup_ge50 - 560*agegroup_ge60  -  680*agegroup_ge70 +  error
+# Calculate probability values using the logistic function
+p <- 1/(1 + exp(-female))
 
+# Generate binary values for sex_female using a binomial distribution
 sex_female <- rbinom(n = num_of_obs, size = 1, prob = p)
+# Calculate and display number of females in the simulated population
 sum(sex_female)
+# Show summary statistics and correlation between variables
 summary(sex_female)
 cor.test(sex_female, agegroup_ls30)
 cor.test(sex_female, agegroup_ge30)
@@ -74,10 +93,10 @@ cor.test(sex_female, agegroup_ge50)
 cor.test(sex_female, agegroup_ge60)
 cor.test(sex_female, agegroup_ge70)
 
-#X:16 race_white correlated with gender and age    m = 0.71   [-.07, 0.15, -.09]
+#X:16 race_white correlated with gender and age    (VA: m = 0.72, sd = 0.45)   
 error=rnorm(num_of_obs, 0, 5)
-xb <-   3 - 1*agegroup_ge40 + 2*agegroup_ge70   - 4* sex_female+ error
-p <- 1/(1 + exp(-xb))
+white <-   3 - 1*agegroup_ge40 + 2*agegroup_ge70   - 4* sex_female+ error
+p <- 1/(1 + exp(-white))
 
 race_White <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(race_White)
@@ -99,59 +118,62 @@ Here we use functional form to create binary variables
 ```{r binary, echo=FALSE}
 set.seed(100)
 
-
 #X6: Insomnia - Patient on drug in the past 365 days
-#Insomnia medications prescribed in the past 365 days, this is a random variable with binomial distribution with a probability of success of 0.0004 on each trial.
+#Generate a simulated random variable representing the number of patients who were prescribed insomnia medication in the past 365 days.
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0004.
 Rx_Insomnia_0to365_D <-  rbinom(num_of_obs, 1,.0004)
+#Show summary statistics
 summary(Rx_Insomnia_0to365_D)
 
-#X7: Insomnia - Patient on drug at time of selection date
+#X7: Insomnia - Patient on drug at time of selection 
+# Generate random errors  (m = 2, sd = 10) using normal distribution
 error=rnorm(num_of_obs, 2, 10)
-xb <-   -30 + 95*Rx_Insomnia_0to365_D  + error
-p <- 1/(1 + exp(-xb))
+insomnia <-   -30 + 95*Rx_Insomnia_0to365_D  + error
+p <- 1/(1 + exp(-insomnia))
 
 Paton_Rx_Insomnia  <- rbinom(n = num_of_obs, size = 1, prob = p)
-#checking the stats
+#Show summary statistics
 summary(Paton_Rx_Insomnia)
 cor(Paton_Rx_Insomnia, Rx_Insomnia_0to365_D)
 
-#X8: methadone prescription, long/short act, no corr with other vars
+#X8: methadone prescription
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0001.
 Rx_OAT_methadone_12m <-rbinom(num_of_obs, 1,.0001)
 summary(Rx_OAT_methadone_12m)
 
 #X9: buprenorphine prescription
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0006.
 Rx_OAT_buprenorphine_12m <-rbinom(num_of_obs, 1,.0006)
 summary(Rx_OAT_buprenorphine_12m)
 
-#X14: Alcohol Use Disorder [0.14, 0.15, 19]   m = [0.05]
-#error=rnorm(num_of_obs, 2, 10)
-#xb <-   -65 + 1.8*Ux_OP_PoC_ED  +  1.2*TotalNumOfAppt + error
-#p <- 1/(1 + exp(-xb))
-
+#X14: Alcohol Use Disorder 
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.059.
 Dx_AlcoholUD_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = 0.059)
+#Show summary statistics
 sum(Dx_AlcoholUD_0to1_Y )
 summary(Dx_AlcoholUD_0to1_Y)
 
 
-#X11: Substance use disorders not included in other definitions in the dataset. [0.23] m = [0.008]
+#X11: Substance use disorders not included in other definitions in the dataset. (VA: m = 0.01, sd = 0.09)
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -14 +  7*Dx_AlcoholUD_0to1_Y  + error
-p <- 1/(1 + exp(-xb))
+catch <-   -14 +  7*Dx_AlcoholUD_0to1_Y  + error
+p <- 1/(1 + exp(-catch))
 
 Dx_SUD_CatchAll_RV2_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = p)
-#checking the stats
+#Show summary statistics
 sum(Dx_SUD_CatchAll_RV2_0to1_Y)
 summary(Dx_SUD_CatchAll_RV2_0to1_Y)
 cor(Dx_AlcoholUD_0to1_Y, Dx_SUD_CatchAll_RV2_0to1_Y)
 
 
 
-#X12: Sedative Use Disorder [0.15, 0.1, 0.08] m = 0.002
+#X12: Sedative Use Disorder  (VA: m = 0.0006, sd = 0.03)
 error=rnorm(num_of_obs, 2, 10)
-xb <-   -52 + 10*Dx_SUD_CatchAll_RV2_0to1_Y + 8*Dx_AlcoholUD_0to1_Y + error
-p <- 1/(1 + exp(-xb))
+sedative <-   -52 + 10*Dx_SUD_CatchAll_RV2_0to1_Y + 8*Dx_AlcoholUD_0to1_Y + error
+p <- 1/(1 + exp(-sedative))
 
 Dx_SedativeUD_0to1_Y    <- rbinom(n = num_of_obs, size = 1, prob = p)
+#Show summary statistics
 sum(Dx_SedativeUD_0to1_Y)
 summary(Dx_SedativeUD_0to1_Y  )
 cor(Dx_SedativeUD_0to1_Y, Dx_SUD_CatchAll_RV2_0to1_Y)
@@ -159,15 +181,16 @@ cor(Dx_SedativeUD_0to1_Y, Dx_AlcoholUD_0to1_Y)
 
 
 
-#X13: Amphetamine and other Stimulant Disorder  [0.15, 0.1] m = 0.005
+#X13: Amphetamine and other Stimulant Disorder (m = 0.01, sd = 0.07)
 error=rnorm(num_of_obs, 0, 5) 
-xb <-   -34 + 38*Dx_SedativeUD_0to1_Y  + 20.5*Dx_SUD_CatchAll_RV2_0to1_Y + error
-p <- 1/(1 + exp(-xb))
+Amphetamine <-   -34 + 38*Dx_SedativeUD_0to1_Y  + 20.5*Dx_SUD_CatchAll_RV2_0to1_Y + error
+p <- 1/(1 + exp(-Amphetamine))
 
 Dx_Amphetamine_OtherStim_UD_0to1  <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Dx_Amphetamine_OtherStim_UD_0to1)
-summary(Dx_Amphetamine_OtherStim_UD_0to1)
 
+#Show summary statistics
+summary(Dx_Amphetamine_OtherStim_UD_0to1)
 cor.test(Dx_Amphetamine_OtherStim_UD_0to1, Dx_SedativeUD_0to1_Y )
 cor.test(Dx_Amphetamine_OtherStim_UD_0to1, Dx_SUD_CatchAll_RV2_0to1_Y)
 
@@ -179,21 +202,22 @@ cor.test(Dx_Amphetamine_OtherStim_UD_0to1, Dx_SUD_CatchAll_RV2_0to1_Y)
 ```{r storm, echo=FALSE}
 
 set.seed(100)
-#Serious Adverse Event, these events are weakly correlated with hospital visits
 
 #X_35:Serious Adverse Event -fall
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.02.
 Dx_SAE_Falls_0to1_Y   <- rbinom(n = num_of_obs, size = 1, prob = 0.02)
 sum(Dx_SAE_Falls_0to1_Y )
 summary(Dx_SAE_Falls_0to1_Y )
 
 
 #X_38:Serious Adverse Event - Acetaminophen
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.00006.
 Dx_SAE_Acetaminophen_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = 0.00006)
 sum(Dx_SAE_Acetaminophen_0to1_Y  )
 summary(Dx_SAE_Acetaminophen_0to1_Y )
 
 #X_40:Serious Adverse Event - Poisoning by Sedative
-
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0006.
 Dx_SAE_Sedative_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = 0.0006)
 #checking the stats
 sum(Dx_SAE_Sedative_0to1_Y)
@@ -201,49 +225,53 @@ summary(Dx_SAE_Sedative_0to1_Y)
 
 
 #X_37: Serious Adverse Event - Vehicular Accidents
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0033.
 Dx_SAE_Vehicle_0to1_Y <-  rbinom(num_of_obs, 1,.0033)
 summary(Dx_SAE_Vehicle_0to1_Y)
 
-#X_36:Serious Adverse Event - Other Accidents, no correlation with other vars m = 0.002
+#X_36:Serious Adverse Event - Other Accidents
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0024.
 Dx_SAE_OtherAccident_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = 0.0024)
 #checking the stats
 summary(Dx_SAE_OtherAccident_0to1_Y)
 sum(Dx_SAE_OtherAccident_0to1_Y)
 
 
-#X_39:Serious Adverse Event - Poisoning by Other drugs  m = 0.0008
+#X_39:Serious Adverse Event - Poisoning by Other drugs 
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.0008.
 Dx_SAE_OtherDrug_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = 0.0008)
 #checking the stats
 summary(Dx_SAE_OtherDrug_0to1_Y)
 sum(Dx_SAE_OtherDrug_0to1_Y)
 
-#pain conditions
+#Pain condition variables
 #X25: Urogenital pain
-#not related to anything
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.014.
 Dx_Pain_Urogenital_0to1_Y <- rbinom(num_of_obs, 1,.014)
 summary(Dx_Pain_Urogenital_0to1_Y)
 
-#X27 Endometriosis cor with urogenital pain 0.2
-
-xb <- -28  + 15*Dx_Pain_Urogenital_0to1_Y   + error
-p <- 1/(1 + exp(-xb))
+#X27 Endometriosis cor with urogenital pain 
+Endometriosis <- -28  + 15*Dx_Pain_Urogenital_0to1_Y   + error
+p <- 1/(1 + exp(-Endometriosis))
 
 Dx_Endometriosis_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = p)
 summary(Dx_Endometriosis_0to1_Y)
 cor(Dx_Endometriosis_0to1_Y, Dx_Pain_Urogenital_0to1_Y)
 
 #X26 Fibromyalgia pain
+# The variable follows a binomial distribution, with each trial having a probability of success of 0.014.
 Dx_Pain_Fibromyalgia_0to1_Y <-  rbinom(num_of_obs, 1,.014)
 summary(Dx_Pain_Fibromyalgia_0to1_Y)
 
 
-# Dx_Pain_Neuropathy_0to1_Y mildly correlated with  age 40-70 about 0.12     m =.078, home based primary care 019 - 0.25, totol num of appt 0.17-0.22
-#X22: neuropathy pain
+#X22: Neuropathy pain
 error=rnorm(num_of_obs, 0, 3)
-xb <-   -22  + 18*agegroup_ge40 + 18*agegroup_ge50 + 18*agegroup_ge60   + error
-p <- 1/(1 + exp(-xb))
+Neuropathy <-   -22  + 18*agegroup_ge40 + 18*agegroup_ge50 + 18*agegroup_ge60   + error
+p <- 1/(1 + exp(-Neuropathy))
 
 Dx_Pain_Neuropathy_0to1_Y  <- rbinom(n = num_of_obs, size = 1, prob = p)
+
+#Show summary statistics
 sum(Dx_Pain_Neuropathy_0to1_Y)
 summary(Dx_Pain_Neuropathy_0to1_Y)
 cor.test(Dx_Pain_Neuropathy_0to1_Y, agegroup_ge40)
@@ -251,13 +279,13 @@ cor.test(Dx_Pain_Neuropathy_0to1_Y, agegroup_ge50)
 cor.test(Dx_Pain_Neuropathy_0to1_Y, agegroup_ge60)
 
 
-#X23 back pain check accidents
-#midly correlated with neuropathy pain r =0.09, age 60 -0.08, age 70: -0.11 Dx_Pain_Fibromyalgia_0to1_Y: 
+#X23 Back pain 
 error=rnorm(num_of_obs, 8, 8)
-xb <-   -12  + 3*Dx_Pain_Neuropathy_0to1_Y + Dx_Pain_Fibromyalgia_0to1_Y - 5*agegroup_ge60 - 5*agegroup_ge70 + error
-p <- 1/(1 + exp(-xb))
+backpain <-   -12  + 3*Dx_Pain_Neuropathy_0to1_Y + Dx_Pain_Fibromyalgia_0to1_Y - 5*agegroup_ge60 - 5*agegroup_ge70 + error
+p <- 1/(1 + exp(-backpain))
 
 Dx_Pain_Back <- rbinom(n = num_of_obs, size = 1, prob = p)
+#Show summary statistics
 sum(Dx_Pain_Back)
 summary(Dx_Pain_Back)
 cor.test(Dx_Pain_Back, Dx_Pain_Neuropathy_0to1_Y)
@@ -265,12 +293,14 @@ cor.test(Dx_Pain_Back, agegroup_ge60)
 
 
 
-#X24 neck pain, vehicle accident 0.07, back pain 0.23, Fibromagia: 0.1, age 70: -0.7
+#X24 Neck pain
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -10 + 9*Dx_SAE_Vehicle_0to1_Y + 4*Dx_Pain_Back + 6*Dx_Pain_Fibromyalgia_0to1_Y  - 1*agegroup_ge60 - 2*agegroup_ge70 + error
-p <- 1/(1 + exp(-xb))
+neckpain <-   -10 + 9*Dx_SAE_Vehicle_0to1_Y + 4*Dx_Pain_Back + 6*Dx_Pain_Fibromyalgia_0to1_Y  - 1*agegroup_ge60 - 2*agegroup_ge70 + error
+p <- 1/(1 + exp(-neckpain))
 
 Dx_Pain_Neck_0to1_Y <- rbinom(n = num_of_obs, size = 1, prob = p)
+
+#Show summary statistics
 sum(Dx_Pain_Neck_0to1_Y )
 summary(Dx_Pain_Neck_0to1_Y)
 cor(Dx_Pain_Neck_0to1_Y, Dx_Pain_Back)
@@ -279,11 +309,11 @@ cor(Dx_Pain_Neck_0to1_Y, Dx_Pain_Fibromyalgia_0to1_Y)
 cor(Dx_Pain_Neck_0to1_Y, agegroup_ge70)
 
 
-# mental illnesses
-#X30 psychoses past year, this one is related to age (-0.14) and substance use such as alcohol(0.11) cannabis, cocaine, nicotine, depression
+# Mental illness variables
+#X30 Psychoses in the past one year
 error=rnorm(num_of_obs, 0, 2)
-xb <-   -1 + 8*Dx_AlcoholUD_0to1_Y  - 18*agegroup_ge50 - 20*agegroup_ge60  -  45*agegroup_ge70 + error
-p <- 1/(1 + exp(-xb))
+Psychoses <-   -1 + 8*Dx_AlcoholUD_0to1_Y  - 18*agegroup_ge50 - 20*agegroup_ge60  -  45*agegroup_ge70 + error
+p <- 1/(1 + exp(-Psychoses))
 
 EH_Psychoses <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(EH_Psychoses)
@@ -291,10 +321,10 @@ summary(EH_Psychoses)
 cor.test(EH_Psychoses, Dx_AlcoholUD_0to1_Y)
 cor.test(EH_Psychoses, agegroup_ge70)
 
-#X31 depression, correlated with alcoho, psychosis, homelessness, elixhausr drug abuse
+#X31 Depression 
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -20 + 2*Dx_AlcoholUD_0to1_Y  + 27*EH_Psychoses + error
-p <- 1/(1 + exp(-xb))
+Depression <-   -20 + 2*Dx_AlcoholUD_0to1_Y  + 27*EH_Psychoses + error
+p <- 1/(1 + exp(-Depression))
 
 Dx_MDD_12m  <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Dx_MDD_12m)
@@ -303,10 +333,10 @@ cor.test(Dx_MDD_12m, Dx_AlcoholUD_0to1_Y)
 cor.test(Dx_MDD_12m, EH_Psychoses)
 
 
-#X32 PTSD m = 0.12, back pain r = 0.11, anxio r=0.22, alcoho r = 0.13
+#X32 PTSD 
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -7 + 2*Dx_Pain_Back + 2*Dx_AlcoholUD_0to1_Y +  error
-p <- 1/(1 + exp(-xb))
+ptsd <-   -7 + 2*Dx_Pain_Back + 2*Dx_AlcoholUD_0to1_Y +  error
+p <- 1/(1 + exp(-ptsd))
 
 Dx_PTSD_1to2_Y  <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Dx_PTSD_1to2_Y)
@@ -316,10 +346,10 @@ cor.test(Dx_PTSD_1to2_Y, Dx_AlcoholUD_0to1_Y)
 
 
 
-#X10: anxiolytic [0.14, 0.20, 0.22] m = 0.1
+#X10: Anxiolytic
 error=rnorm(num_of_obs, 0, 5) 
-xb <-   -7  + 4*Dx_PTSD_1to2_Y + error
-p <- 1/(1 + exp(-xb))
+Anxiolytic <-   -7  + 4*Dx_PTSD_1to2_Y + error
+p <- 1/(1 + exp(-Anxiolytic))
 
 Rx_Anxiolytic_0to365_D   <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Rx_Anxiolytic_0to365_D )
@@ -327,12 +357,11 @@ summary(Rx_Anxiolytic_0to365_D )
 cor.test(Rx_Anxiolytic_0to365_D , Dx_PTSD_1to2_Y)
 
 
-#X33 homelessness [0.16, 0.10, 0.16] m = 0.02
+#X33 Homelessness
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -4   + 1.5*Dx_SUD_CatchAll_RV2_0to1_Y + 2*Dx_AlcoholUD_0to1_Y + 195*Dx_Amphetamine_OtherStim_UD_0to1
-p <- 1/(1 + exp(-xb))
+Homelessness <-   -4   + 1.5*Dx_SUD_CatchAll_RV2_0to1_Y + 2*Dx_AlcoholUD_0to1_Y + 195*Dx_Amphetamine_OtherStim_UD_0to1
+p <- 1/(1 + exp(-Homelessness))
  
-
 Dx_Homeless_1to2_Y <-  rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Dx_Homeless_1to2_Y)
 summary(Dx_Homeless_1to2_Y)
@@ -343,10 +372,10 @@ cor.test(Dx_Homeless_1to2_Y, Dx_Amphetamine_OtherStim_UD_0to1)
 
 
 
-#X34: obesity  m = 0.13  [0.17]
+#X34: Obesity  
 error=rnorm(num_of_obs, 0, 5)
-xb <-   -5.5 + 0.3*Dx_Pain_Neuropathy_0to1_Y + error
-p <- 1/(1 + exp(-xb))
+Obesity <-   -5.5 + 0.3*Dx_Pain_Neuropathy_0to1_Y + error
+p <- 1/(1 + exp(-Obesity))
 
 Dx_EH_Obesity_1to2_Y <-   rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Dx_EH_Obesity_1to2_Y)
@@ -354,14 +383,14 @@ summary(Dx_EH_Obesity_1to2_Y)
 
 
 #################
-#X28: Opioids For Pains in the past 0 to 182 days (binary), neurpathy 0.13, backpain: 0.26, neck pain: 0,14, fib: 0.07, anxio: 0.17 m= 0.12
+#X28: Opioids For Pains in the past 0 to 182 days
 error=rnorm(num_of_obs, 0, 5)
-xb <-  -15  + 4*Dx_Pain_Fibromyalgia_0to1_Y  +  4*Dx_Pain_Neuropathy_0to1_Y + 5*Dx_Pain_Neck_0to1_Y + 7*Dx_Pain_Back + 6*Rx_Anxiolytic_0to365_D + error
-p <- 1/(1 + exp(-xb))
+op <-  -15  + 4*Dx_Pain_Fibromyalgia_0to1_Y  +  4*Dx_Pain_Neuropathy_0to1_Y + 5*Dx_Pain_Neck_0to1_Y + 7*Dx_Pain_Back + 6*Rx_Anxiolytic_0to365_D + error
+p <- 1/(1 + exp(-op))
 
 Rx_OpioidForPain_0to182_D <- rbinom(n = num_of_obs, size = 1, prob = p)
 
-#print statistics
+#Show statistics
 sum(Rx_OpioidForPain_0to182_D)
 sd(Rx_OpioidForPain_0to182_D)
 summary(Rx_OpioidForPain_0to182_D)
@@ -372,12 +401,13 @@ cor.test(Rx_OpioidForPain_0to182_D, Dx_Pain_Back)
 cor.test(Rx_OpioidForPain_0to182_D,  Rx_Anxiolytic_0to365_D)
 
 
-#X29 Opioids For Pains in the past 182 to 365 days binary   neurpathy 0.13, backpain: 0.26, neck pain: 0,14, fib: 0.07, anxio: 0.17, sd = [0.12, 0.33]
-
-xb <-  -12 + 0.1*Rx_OpioidForPain_0to182_D  + 4*Dx_Pain_Fibromyalgia_0to1_Y  +  4*Dx_Pain_Neuropathy_0to1_Y + 5*Dx_Pain_Neck_0to1_Y + 5*Dx_Pain_Back + 6*Rx_Anxiolytic_0to365_D  + error
-p <- 1/(1 + exp(-xb))
+#X29 Opioids For Pains in the past 182 to 365 days binary 
+op365 <-  -12 + 0.1*Rx_OpioidForPain_0to182_D  + 4*Dx_Pain_Fibromyalgia_0to1_Y  +  4*Dx_Pain_Neuropathy_0to1_Y + 5*Dx_Pain_Neck_0to1_Y + 5*Dx_Pain_Back + 6*Rx_Anxiolytic_0to365_D  + error
+p <- 1/(1 + exp(-op365))
 
 Rx_OpioidForPain_182to365_D <- rbinom(n = num_of_obs, size = 1, prob = p)
+
+#Show statistics
 sum(Rx_OpioidForPain_182to365_D)
 summary(Rx_OpioidForPain_182to365_D)
 cor.test(Rx_OpioidForPain_182to365_D, Rx_OpioidForPain_0to182_D)
@@ -387,20 +417,48 @@ cor.test(Rx_OpioidForPain_182to365_D, Dx_Pain_Back)
 cor.test(Rx_OpioidForPain_182to365_D, Rx_Anxiolytic_0to365_D)
 
 
-#X41-52 MME  Morphine equivalent daily dose 10 months ago, continous ,  these variables are accumulative 
-#c<- rbeta(num_of_obs,1,150) #generate beta distribution
+
+```
+
+
+#Generate Medd for 1 - 11, each month is generated by deducting a value drawn within the range (0, 8000) from the preceding month.
+This process of generating Generate Medd is also described in the last paragraph of section 4.2 (Draft)
+
+The function `add_Medd` takes three arguments: `var1` (a vector representing the variable to which a value will be added), `probs` (a vector representing the probabilities of the random values being 0 or a random value within the range of -5000 to `max_rand`), and `max_rand` (a parameter representing the upper limit of the random values that can be added to `var1`). 
+
+Within the function, there is a nested function `add_val` that takes a single value `x` and adds a random value to it. The random value is generated using the `runif` function, which draws a uniform random value within the range of -5000 to `max_rand`. 
+
+The possible values that can be added to `x` are defined in the vector `c(0, random_add)`, with the probabilities for each value defined in the `probs` vector. If the randomly selected value is 0, the final value will be `x` (i.e., no change). Otherwise, the final value will be `x` plus the randomly selected value.
+
+
+-preceding month: the preceding month variable
+-probs[0]: probability of the addition value is 0, probability of the addition value is random value drawn between -5000 and max_rand
+-max_rand: upper bound of specified range
+
+```{r Medd}
+#X41-52 MME Morphine equivalent daily dose 10 months ago: Draft, see section 4.2 paragraph 4
+#Medd: variable representing the sum of Medd at the end of each month in the past year
+
+#Medd were 12 highly correlated variables representing the sum of Medd at the end of the month (0, 1, 2, ..., 11) in the past year, Month 0 was created with a functional form. The following months was generated by deducting a value drawn within the range $v \in (0, 8000)$ from the preceding month.
+
+#Month 0
+#Generate error term
 error=rnorm(num_of_obs, 0, 10)
-#use regression to generate a continous variable dependent on some variables
+
+#Calculate Medd using a linear formula with various variables month 0
 Medd <-   1 + 4*Rx_OpioidForPain_0to182_D + 2*Dx_Pain_Fibromyalgia_0to1_Y +  2*Dx_Pain_Neuropathy_0to1_Y + 2*Dx_Pain_Neck_0to1_Y + 3*Rx_Anxiolytic_0to365_D+ 2*Dx_MDD_12m + error
 
-rescaled_Medd <- scales::rescale(Medd, to = c(0, 5000)) #rescale the beta distribution
-Rx_Medd <- add_random_zero(rescaled_Medd) #add 0 randomly to beta distribution
+#Rescale Medd using the scales package
+rescaled_Medd <- scales::rescale(Medd, to = c(0, 5000)) 
+
+#To increase the sparsity of rescaled_Medd, we randomly flip the value of rescaled_Medd to 0. Draft section 4.2: "To increase the sparsity of the variable, we randomly flip 99.5\% of the values in month 0 to 0."
+Rx_Medd <- add_random_zero(rescaled_Medd) 
 summary(Rx_Medd)
 
 cor(Rx_Medd, Rx_OpioidForPain_0to182_D)
 
-
-Rx_Medd_1m <- add_Medd(Rx_Medd, probs=  c(0.9999, 0.0001), 5000) # parameters: probs of adding 0, prob of adding a random number, bound of the random number
+#Draft: section 4.2, "The following month to the preceding month, the value was randomly drawn within the range $v \in (-5000, 8000)$ according to specified probabilities, the probability of this additional value to be 0 is 0.9999. Negative numbers after the deduction were converted to 0."
+Rx_Medd_1m <- add_Medd(Rx_Medd, probs=  c(0.9999, 0.0001), 8000) 
 Rx_Medd_2m <- add_Medd(Rx_Medd_1m, probs=  c(0.9999, 0.0001), 5000)
 Rx_Medd_3m <- add_Medd(Rx_Medd_2m, probs=  c(0.9999, 0.0001), 5000)
 Rx_Medd_4m <- add_Medd(Rx_Medd_3m, probs=  c(0.9999, 0.001), 8000)
@@ -413,10 +471,7 @@ Rx_Medd_10m <- add_Medd(Rx_Medd_9m, probs=  c(0.9999, 0.0001), 8000)
 Rx_Medd_11m <- add_Medd(Rx_Medd_10m, probs=  c(0.9999, 0.0001), 8000)
 
 
-#X18: Urine drug screen for heroin/morphine past year
-#correlated but not overlapping
-#Dx_UDS1_12m <- rbinom(num_of_obs, 1,.08)
-error=rnorm(num_of_obs, 0, 5)
+#X18: Urine drug screen for heroin/morphine in the past one year
 error=rnorm(num_of_obs, 2, 10)
 xb <-   -16 +  1*Rx_Medd + 1*Rx_Medd_10m + 1*Rx_Medd_11m + 1*Rx_Medd_1m + 1*Rx_Medd_2m + 1*Rx_Medd_3m + 1*Rx_Medd_4m + 1*Rx_Medd_5m + 1*Rx_Medd_6m + 1*Rx_Medd_7m + 1*Rx_Medd_8m + 1*Rx_Medd_9m  + error
 p <- 1/(1 + exp(-xb))
@@ -427,7 +482,7 @@ summary(Dx_UDS1_12m)
 cor(Rx_Medd, Dx_UDS1_12m)
 
 
-#X19: Urine drug screen for nonmorphine opioid compounds past year
+#X19: Urine drug screen for nonmorphine opioid compounds in the past one year
 error=rnorm(num_of_obs, 2, 10)
 xb <-   -30 + 35*Dx_UDS1_12m +  1*Rx_Medd + 1*Rx_Medd_10m + 1*Rx_Medd_11m + 1*Rx_Medd_1m + 1*Rx_Medd_2m + 1*Rx_Medd_3m + 1*Rx_Medd_4m + 1*Rx_Medd_5m + 1*Rx_Medd_6m + 1*Rx_Medd_7m + 1*Rx_Medd_8m + 1*Rx_Medd_9m + error
 p <- 1/(1 + exp(-xb))
@@ -439,7 +494,7 @@ cor(Dx_UDS2_12m, Dx_UDS1_12m)
 cor(Dx_UDS2_12m, Rx_Medd)
 
 
-#X20: Urine drug screen for nonopioid abusable substances past year
+#X20: Urine drug screen for nonopioid abusable substances in the past one year
 error=rnorm(num_of_obs, 2, 10)
 xb <-   -22 + 35*Dx_UDS1_12m + +  1*Rx_Medd + 1*Rx_Medd_10m + 1*Rx_Medd_11m + 1*Rx_Medd_1m + 1*Rx_Medd_2m + 1*Rx_Medd_3m + 1*Rx_Medd_4m + 1*Rx_Medd_5m + 1*Rx_Medd_6m + 1*Rx_Medd_7m + 1*Rx_Medd_8m + 1*Rx_Medd_9m+ error
 p <- 1/(1 + exp(-xb))
@@ -451,7 +506,7 @@ cor(Dx_UDS3_12m, Dx_UDS1_12m)
 cor(Dx_UDS3_12m, Dx_UDS2_12m)
 cor(Dx_UDS3_12m, Rx_Medd)
 
-#X21: care at pain clinic, mildly related to Medd 0.13, 0.21 correlated with Dx_USD, binary
+#X21: care at pain clinic
 error=rnorm(num_of_obs, 0, 15)
 xb <-   -26 + 0.005*Rx_Medd + 0.005*Rx_Medd_10m + 0.005*Rx_Medd_11m + 0.005*Rx_Medd_1m +0.005*Rx_Medd_2m + 0.005*Rx_Medd_3m + 0.005*Rx_Medd_4m + 0.005*Rx_Medd_5m + 0.005*Rx_Medd_6m + 0.005*Rx_Medd_7m + 0.005*Rx_Medd_8m +0.005*Rx_Medd_9m + 5*Dx_UDS1_12m +5* Dx_UDS2_12m + 5*Dx_UDS3_12m + error
 p <- 1/(1 + exp(-xb))
@@ -465,46 +520,65 @@ cor.test(Ux_RehMedPain, Dx_UDS1_12m)
 
 ```
 
+
+## Creating hospital visit count variables
+Draft section 4.2: "The slope variables include emergency department stops, urgent care stops, tobacco cessation stops,  home-based primary care (HBPC) stops and total healthcare provider appointments. To simulate slope variables, we first created the 30-day or 730-day variable with Pareto distributions 
+
+The succeeding variable was constructed based on the created variable using the following strategy: let $Z$  denotes a 30-day or 730-day variable, $Z'$ denotes a 30-day variable or 730-day variable, if $Z$ is a 30-day variable and $Z'$ is a 730-day variable , $Z' = Z + \delta$, conversely, if  $Z$  is a 730-day variable $Z'$ is a 30-day variable, $Z' = Z - \delta$. $\delta$ is the number of hospital visit count assigned according to a predefined probability $P$, $Range(\delta)$ = \{0, 1, ..., $q$ \}, $q$ is an upper bound of $\delta$ and it is equal to the maximum number of visits to the corresponding healthcare provider. 
+
+Depending on the structural of the new variable, we designed two functions to generate $Z'$. In function 1, we defined  $P(\delta = 0) = p_1$, $P (\delta \ \in (1, \tau) ) = p_2$ and $P (\delta \ \in (\tau, q) ) = p_3$, $\tau$ denotes a threshold, $\tau < q$ and $p_2 > p_3$. In function 2, we defined $P(\delta = 0) = p_1$, $P (\delta != 0) = p_2$. In addition, we randomly flip some of the values greater than a threshold to a smaller value to simulate a longtail effect for the variable."
+
+Pareoto variable: https://search.r-project.org/CRAN/refmans/EnvStats/html/
+
+Section 4.2 on the draft
 ```{r hospital visits} 
 set.seed(102)
 
 #Variable name X1: Count of Emergency Department stops in the last 730 days m 0.63
 error=rnorm(num_of_obs, 0, 5)
-#use regression to create the variable 
+
 Ux_OP_PoC_ED_730days <-  1 + 20*Rx_OpioidForPain_0to182_D +  20*Rx_OpioidForPain_182to365_D  + 5*Dx_SAE_Falls_0to1_Y+ 5*Dx_SUD_CatchAll_RV2_0to1_Y+  5*Dx_Pain_Fibromyalgia_0to1_Y  + 4*Dx_Amphetamine_OtherStim_UD_0to1 +  4*Dx_Pain_Neuropathy_0to1_Y + 5*Dx_Pain_Neck_0to1_Y + 5*Dx_Pain_Back + 10*Dx_PTSD_1to2_Y + 6*Rx_Anxiolytic_0to365_D + 5*Dx_Homeless_1to2_Y  + error
 
-Ux_OP_PoC_ED_730days <- rescale(Ux_OP_PoC_ED_730days, to = c(0, 281)) #rescale the beta distribution
+# Rescale the distribution to a range of 0 to 281
+Ux_OP_PoC_ED_730days <- rescale(Ux_OP_PoC_ED_730days, to = c(0, 281))
+# Round up the number because the values are counts 
 Ux_OP_PoC_ED_730days <- round(Ux_OP_PoC_ED_730days, digits = 0)
+
+# This is a sparse variable because many patients do not have hospital visits.
+# The function add_random_zero_hospital takes in a variable var1 and converts some of its observations to 0
+# Draft 4.2 "We also flip 99\% of the values in emergency department stops 730-day and total healthcare provider appointment   730-day to 0 to increase the sparsity of the variable. "
 Ux_OP_PoC_ED_730days <- add_random_zero_hospital(Ux_OP_PoC_ED_730days)
 
 cor.test(Ux_OP_PoC_ED_730days, Rx_OpioidForPain_0to182_D)
 cor.test(Ux_OP_PoC_ED_730days, Dx_SAE_Falls_0to1_Y)
 
 
-
-Ux_OP_PoC_ED_30days <- reduce_counts(Ux_OP_PoC_ED_730days, 281, 13) 
-#check their correlations
-cor(Ux_OP_PoC_ED_30days, Ux_OP_PoC_ED_730days)
+# the 730 days variable is a culmulative sum of 30days variable and the succeeding variables. Therefore, to generate the 30 days variable, we perform reduction on the 730 variable
+# Draft Section 4.2: In function 2, we defined $P(\delta = 0) = p_1$, $P (\delta != 0) = p_2$. In addition, we randomly flip some of the values greater than a threshold to a smaller value to simulate a longtail effect for the variable. 
+Ux_OP_PoC_ED_30days <- reduce_counts_appointment(Ux_OP_PoC_ED_730days, 281, 13) 
 # take the difference between the two variables
 Ux_OP_PoC_ED <- Ux_OP_PoC_ED_730days - Ux_OP_PoC_ED_30days 
-cor(Ux_OP_PoC_ED, Rx_OpioidForPain_182to365_D)
+
 
 ##X2: Count of Urgent Care stops in the last N days
-Ux_OP_PoC_UC_30days <- get_pareto_var(0.15, 4, num_of_obs)  #get_pareto_var parameters:location, shape, num
-summary(Ux_OP_PoC_UC_30days)
-#add counts to the 30 days variable to create the 730 days variable
-# add_counts parameters: 30 days variable, maximum value of the new variable, threshold: values bigger than threshold will have probability of.0000001 to be sampled as none 0, otherwise the probability to be non-zero is .005
+#See function to generate a Pareto distribution
+Ux_OP_PoC_UC_30days <- get_pareto_var(0.15, 4, num_of_obs) 
+
+#the 730 days variable is a culmulative sum of 30days variable and the succeeding variables. Therefore, to generate the 30 days variable, we perform addition on the 30 variable
+#Draft section 4.2 In function 1, we defined  $P(\delta = 0) = p_1$, $P (\delta \ \in (1, \tau) ) = p_2$ and $P (\delta \ \in (\tau, q) ) = p_3$, $\tau$ denotes a threshold, $\tau < q$ and $p_2 > p_3$. 
+
 Ux_OP_PoC_UC_730days <- add_counts(Ux_OP_PoC_UC_30days, 259, 5)
 # take the difference between the two variables
 Ux_OP_PoC_UC <- Ux_OP_PoC_UC_730days - Ux_OP_PoC_UC_30days
 
-#X3: Count of Tobacco Cessation stops in the last N days, continous, 
-Ux_OP_PoC_TobaccoCessation_30day <- get_pareto_var(0.1, 5, num_of_obs)  #get_pareto_var parameters:location, shape, num
+#X3: Count of Tobacco Cessation stops in the last N days
+Ux_OP_PoC_TobaccoCessation_30day <- get_pareto_var(0.1, 5, num_of_obs) 
 summary(Ux_OP_PoC_TobaccoCessation_30day)
-#add counts to the 30 days variable to create the 730 days variable, var1: 30 days variable, var2: maximum value of new variable, var3: threshold 
+#the 730 days variable is a culmulative sum of 30days variable and the succeeding variables. Therefore, to generate the 30 days variable, we perform addition on the 30 variable
+#Draft section 4.2 In function 1, we defined  $P(\delta = 0) = p_1$, $P (\delta \ \in (1, \tau) ) = p_2$ and $P (\delta \ \in (\tau, q) ) = p_3$, $\tau$ denotes a threshold, $\tau < q$ and $p_2 > p_3$. 
 Ux_OP_PoC_TobaccoCessation_730day  <- add_counts(Ux_OP_PoC_TobaccoCessation_30day, 151, 5)
 summary(Ux_OP_PoC_TobaccoCessation_730day)
-# take the difference between the two variables
+# Take the difference between the two variables 
 Ux_OP_PoC_TobaccoCessation <- Ux_OP_PoC_TobaccoCessation_730day - Ux_OP_PoC_TobaccoCessation_30day
 cor.test(Ux_OP_PoC_TobaccoCessation_730day, Ux_OP_PoC_TobaccoCessation_30day)
 
@@ -512,39 +586,39 @@ cor.test(Ux_OP_PoC_TobaccoCessation_730day, Ux_OP_PoC_TobaccoCessation_30day)
 Ux_OP_MHOC_HBPC_30days <- get_pareto_var(0.01, 3, num_of_obs)   #get_pareto_var parameters:location, shape, num
 summary(Ux_OP_MHOC_HBPC_30days)
 sd(Ux_OP_MHOC_HBPC_30days)
-#add_counts parameters: 30 days variable, maximum value of the new variable, threshold: values bigger than threshold will have probability of.0000001 to be sampled as none 0, otherwise the probability to be non-zero is .005
+#the 730 days variable is a culmulative sum of 30days variable and the succeeding variables. Therefore, to generate the 30 days variable, we perform addition on the 30 variable
+#Draft section 4.2 In function 1, we defined  $P(\delta = 0) = p_1$, $P (\delta \ \in (1, \tau) ) = p_2$ and $P (\delta \ \in (\tau, q) ) = p_3$, $\tau$ denotes a threshold, $\tau < q$ and $p_2 > p_3$. 
 Ux_OP_MHOC_HBPC_730days  <- add_counts(Ux_OP_MHOC_HBPC_30days, 107, 2)
 summary(Ux_OP_MHOC_HBPC_730days )
-# take the difference between the two variables
+# Take the difference between the two variables
 Ux_OP_MHOC_HBPC <- Ux_OP_MHOC_HBPC_730days - Ux_OP_MHOC_HBPC_30days
 
-#: Count of appointments in the last 730 days m = 15.96
+#: Count of appointments in the last 730 days
 error=rnorm(num_of_obs, 0, 5)
-#use regression to create the variable 
+# Use Functional form to generate the 730 days variable
 TotalNumOfAppt_730days <-  10 + 10*Rx_OpioidForPain_0to182_D  +  10*Rx_OpioidForPain_182to365_D + 5*Dx_Pain_Fibromyalgia_0to1_Y  +  4*Dx_Pain_Neuropathy_0to1_Y + 5*Dx_Pain_Neck_0to1_Y + 5*Dx_Pain_Back + 5*Dx_SUD_CatchAll_RV2_0to1_Y+ 5*Dx_AlcoholUD_0to1_Y + 6*Rx_Anxiolytic_0to365_D + 5*Dx_EH_Obesity_1to2_Y + 0.5*Ux_OP_PoC_ED  + error
 
-TotalNumOfAppt_730days <- rescale(TotalNumOfAppt_730days, to = c(0, 969)) #rescale the beta distribution
+TotalNumOfAppt_730days <- rescale(TotalNumOfAppt_730days, to = c(0, 969)) #rescale the distribution
 TotalNumOfAppt_730days <- round(TotalNumOfAppt_730days, digits = 0)
+
+# Here we randomly convert some of the values of a variable to a smaller number by multiplying the original value with either 0 or 1, then convert the 0 to a smaller number.
+# Draft section 4.2 "We also flip 99\% of the values in emergency department stops 730-day and total healthcare provider appointment   730-day to 0 to increase the sparsity of the variable. "
 TotalNumOfAppt_730days <- add_random_zero_appointment(TotalNumOfAppt_730days)
 
-#cor.test(TotalNumOfAppt_730days, Rx_OpioidForPain_0to182_D)
-#cor.test(TotalNumOfAppt_730days, Rx_Anxiolytic_0to365_D)
-#cor.test(TotalNumOfAppt_730days, Dx_EH_Obesity_1to2_Y)
-
+# Draft Section 4.2: In function 2, we defined $P(\delta = 0) = p_1$, $P (\delta != 0) = p_2$. In addition, we randomly flip some of the values greater than a threshold to a smaller value to simulate a longtail effect for the variable. 
 #create 90 days variable , var 1: maximun num of original variable, 
 TotalNumOfAppt_91days <- reduce_counts_appointment(TotalNumOfAppt_730days, 969, 5) 
 
-## take the difference between the two variables
+## Take the difference between the two variables
 TotalNumOfAppt <- TotalNumOfAppt_730days - TotalNumOfAppt_91days
 
-#cor.test(TotalNumOfAppt, Dx_Pain_Back)
 
 ```
 
 
 
 ```{r outcome}
-# ## build Y variable
+# Constuct the outcome variable, Draft table 3
 set.seed(106)
 error=rnorm(num_of_obs, 0, 25)
 xb <- -300 +  0.05*Ux_OP_PoC_ED + 0.5*Ux_OP_PoC_UC + 0.1*Ux_OP_PoC_TobaccoCessation  + 1*Ux_OP_MHOC_HBPC + 0.001*TotalNumOfAppt  +   45*Rx_Insomnia_0to365_D + 25*Paton_Rx_Insomnia + 150*Rx_OAT_methadone_12m + 100*Rx_OAT_buprenorphine_12m + 80*Rx_Anxiolytic_0to365_D + 1*Dx_SUD_CatchAll_RV2_0to1_Y + 3*Dx_SedativeUD_0to1_Y + 100*Dx_Amphetamine_OtherStim_UD_0to1 +  1*Dx_AlcoholUD_0to1_Y - 25*sex_female +  43*race_White + 0.004*agegroup_ls30 + 28*agegroup_ge30 + 28*agegroup_ge40 + 28*agegroup_ge50 + 28*agegroup_ge60 - 30*agegroup_ge70  + 20*Dx_UDS1_12m + 20*Dx_UDS2_12m+ 20*Dx_UDS3_12m + 20*Ux_RehMedPain +52*Dx_Pain_Neuropathy_0to1_Y  + 25*Dx_Pain_Back + 25*Dx_Pain_Neck_0to1_Y + 1*Dx_Pain_Urogenital_0to1_Y + 5*Dx_Pain_Fibromyalgia_0to1_Y+ 60*Dx_Endometriosis_0to1_Y + 5*Rx_OpioidForPain_0to182_D + 10*Rx_OpioidForPain_182to365_D + 5*EH_Psychoses  + 20*Dx_MDD_12m + 0.2*Dx_PTSD_1to2_Y + 0.005*Dx_Homeless_1to2_Y +  0.5*Dx_EH_Obesity_1to2_Y + 60*Dx_SAE_Falls_0to1_Y + 40*Dx_SAE_OtherAccident_0to1_Y + 60*Dx_SAE_Vehicle_0to1_Y + 100*Dx_SAE_Acetaminophen_0to1_Y + 80*Dx_SAE_OtherDrug_0to1_Y + 100*Dx_SAE_Sedative_0to1_Y + 0.0005*Rx_Medd + 0.0005*Rx_Medd_1m +0.0005*Rx_Medd_2m + 0.0001*Rx_Medd_3m + 0.0001*Rx_Medd_4m + 0.0001*Rx_Medd_5m + 0.0001*Rx_Medd_6m + 0.0001*Rx_Medd_7m + 0.0001*Rx_Medd_8m + 0.0001*Rx_Medd_9m + 0.0001*Rx_Medd_10m + 0.0001*Rx_Medd_11m + error
@@ -554,34 +628,28 @@ p <- 1/(1 + exp(-xb))
 Dx_OpioidOverdose_0to1_Y <- rbinom(n = num_of_obs, size = 1, prob = p)
 sum(Dx_OpioidOverdose_0to1_Y)
 summary(Dx_OpioidOverdose_0to1_Y)
-#checking the correlations
-cor.test(Dx_OpioidOverdose_0to1_Y, TotalNumOfAppt)
-# cor.test(Dx_OpioidOverdose_0to1_Y, Dx_Endometriosis_0to1_Y)
-# cor.test(Dx_OpioidOverdose_0to1_Y, Dx_EH_Obesity_1to2_Y)
-# cor.test(Dx_OpioidOverdose_0to1_Y, Dx_Homeless_1to2_Y)
-# cor.test(Dx_OpioidOverdose_0to1_Y, Ux_OP_MHOC_HBPC)
-# cor.test(Dx_OpioidOverdose_0to1_Y, Dx_SAE_Falls_0to1_Y)
-# cor.test(Dx_OpioidOverdose_0to1_Y,  Ux_OP_PoC_ED)
-# cor.test(Dx_OpioidOverdose_0to1_Y,  Ux_OP_PoC_UC)
 
 
-# #combine all variables to generate the simulated dataset, list x number in here, in the paper we define the one-hot encoding variables as one variable
+# Combine all variables to create a table for the simulated dataset
 simulated_data <- cbind(Ux_OP_PoC_ED, Ux_OP_PoC_UC,  Ux_OP_PoC_TobaccoCessation,  TotalNumOfAppt, Ux_OP_MHOC_HBPC, Rx_OpioidForPain_0to182_D, Rx_OpioidForPain_182to365_D,  Rx_Insomnia_0to365_D, Paton_Rx_Insomnia, Dx_SAE_Acetaminophen_0to1_Y, Dx_SAE_Falls_0to1_Y, Dx_SAE_OtherAccident_0to1_Y, Dx_SAE_OtherDrug_0to1_Y, Dx_SAE_Sedative_0to1_Y, Dx_SAE_Vehicle_0to1_Y, Dx_SedativeUD_0to1_Y, Dx_SUD_CatchAll_RV2_0to1_Y, Dx_AlcoholUD_0to1_Y, Dx_Amphetamine_OtherStim_UD_0to1, Rx_Medd, Rx_Medd_10m, Rx_Medd_11m, Rx_Medd_1m, Rx_Medd_2m, Rx_Medd_3m, Rx_Medd_4m, Rx_Medd_5m, Rx_Medd_6m, Rx_Medd_7m, Rx_Medd_8m,Rx_Medd_9m, agegroup_ls30, agegroup_ge30, agegroup_ge40, agegroup_ge50, agegroup_ge60, agegroup_ge70, sex_female, race_White,  Dx_UDS1_12m, Dx_UDS2_12m, Dx_UDS3_12m,  EH_Psychoses, Dx_MDD_12m, Dx_Pain_Urogenital_0to1_Y, Dx_Pain_Neuropathy_0to1_Y, Dx_Pain_Back, Dx_Pain_Neck_0to1_Y, Dx_Pain_Fibromyalgia_0to1_Y, Dx_Endometriosis_0to1_Y, Dx_PTSD_1to2_Y,Dx_Homeless_1to2_Y,Ux_RehMedPain, Dx_EH_Obesity_1to2_Y, Rx_Anxiolytic_0to365_D,  Rx_OAT_methadone_12m, Rx_OAT_buprenorphine_12m, EH_Psychoses, Dx_OpioidOverdose_0to1_Y)
 
 
-#generate stats and correlation table, we want a different order of these variables in the table to match with the variable orders in the stats table
+# Combine all variables to create a table for the displaying statistics, this table contains the intermediate variables for the slope variables
 simulated_data_for_stats <- cbind(Ux_OP_PoC_ED_30days, Ux_OP_PoC_ED_730days, Ux_OP_PoC_UC_30days, Ux_OP_PoC_UC_730days, Ux_OP_PoC_TobaccoCessation_30day,  Ux_OP_PoC_TobaccoCessation_730day, TotalNumOfAppt_91days, TotalNumOfAppt_730days,  Ux_OP_MHOC_HBPC_30days, Ux_OP_MHOC_HBPC_730days, Rx_OpioidForPain_0to182_D, Rx_OpioidForPain_182to365_D,  Rx_Insomnia_0to365_D, Paton_Rx_Insomnia, Dx_SAE_Acetaminophen_0to1_Y, Dx_SAE_Falls_0to1_Y, Dx_SAE_OtherAccident_0to1_Y, Dx_SAE_OtherDrug_0to1_Y, Dx_SAE_Sedative_0to1_Y, Dx_SAE_Vehicle_0to1_Y, Dx_SedativeUD_0to1_Y, Dx_SUD_CatchAll_RV2_0to1_Y, Dx_AlcoholUD_0to1_Y, Dx_Amphetamine_OtherStim_UD_0to1, Rx_Medd, Rx_Medd_10m, Rx_Medd_11m, Rx_Medd_1m, Rx_Medd_2m, Rx_Medd_3m, Rx_Medd_4m, Rx_Medd_5m, Rx_Medd_6m, Rx_Medd_7m, Rx_Medd_8m,Rx_Medd_9m, agegroup_ls30, agegroup_ge30, agegroup_ge40, agegroup_ge50, agegroup_ge60, agegroup_ge70, sex_female, race_White,  Dx_UDS1_12m, Dx_UDS2_12m, Dx_UDS3_12m, EH_Psychoses, Dx_MDD_12m, Dx_PTSD_1to2_Y, Dx_Homeless_1to2_Y, Ux_RehMedPain, Dx_EH_Obesity_1to2_Y, Dx_Pain_Urogenital_0to1_Y, Dx_Pain_Neuropathy_0to1_Y, Dx_Pain_Back, Dx_Pain_Neck_0to1_Y, Dx_Pain_Fibromyalgia_0to1_Y, Dx_Endometriosis_0to1_Y, Rx_Anxiolytic_0to365_D, Rx_OAT_methadone_12m, EH_Psychoses, Rx_OAT_buprenorphine_12m, Dx_OpioidOverdose_0to1_Y)
 
 ```
 
+# Storing data and computing data statistics
+This section stores the simulated dataset and compute descriptive statistics of the dataset
 
 ```{r write files}
 #write.csv(simulated_data, "/Users/luciachen/Desktop/simulated_data/simulated_data_big_sample.csv")
-#convert variables to dataframe and data table
+
+#Convert variables to dataframe and data table
 simulated_data <- as.data.frame(simulated_data)
 simulated_data <- data.table(simulated_data)
 
-#change var names, here we change the pain conditions and mental illenss with a different prefix for variable selection in the ML pipeline 
+# Change variable names to have a different prefix for variable selection in the ML pipeline 
 simulated_data  <- simulated_data %>% rename("MH_Psychoses" = "EH_Psychoses",
                                         "MH_MDD_12m" = "Dx_MDD_12m",
                                         "MH_PTSD_1to2_Y" = "Dx_PTSD_1to2_Y", 
@@ -594,18 +662,18 @@ simulated_data  <- simulated_data %>% rename("MH_Psychoses" = "EH_Psychoses",
                                         "PA_Pain_Fibromyalgia_0to1_Y" = "Dx_Pain_Fibromyalgia_0to1_Y",
                                         "PA_Endometriosis_0to1_Y" = "Dx_Endometriosis_0to1_Y")
 
-#convert the stats variables into tables
+# Convert the stats variables into tables
 simulated_data_for_stats <- as.data.frame(simulated_data_for_stats)
 simulated_data_for_stats <- data.table(simulated_data_for_stats)
 
-#get correlations between variables 
+# Get correlations between variables
 #simulated_data_corr <- round(cor(simulated_data), digits = 4)
 
-#get data statistics
+# Get data statistics
 simulated_stats <- describe(simulated_data_for_stats, quant=c(.1, .2, .3, .4, .5, .6, .7, .8, .9), skew = FALSE)
 simulated_stats <- within(simulated_stats, rm("se", "range", "vars", "n"))
 
-# transpose metrics
+# Transpose the metrics
 t_simulated_stats<- t(simulated_stats)
 
 # get row and colnames in order
@@ -614,59 +682,31 @@ rownames(t_simulated_stats) <- colnames(simulated_stats)
 
 #store all the stats results
 write.csv(simulated_data,"/Users/luciachen/Dropbox/simulated_data/simulated_data_big_sample.csv")
-#write.csv(simulated_data, "/Users/luciachen/Desktop/Desktop_MacbookPro/simulated_data/simulated_data_big_sample.csv") #data for ML pipeline
-#write.csv(simulated_data_corr, "/Users/luciachen/Dropbox/simulated_data/simulated_data_corr.csv") #correlation
 write.csv(t_simulated_stats, "/Users/luciachen/Dropbox/simulated_data/simulated_stats.csv") #stats 
 
 
 #select a subset of correlation from the the storm correlation table
 corr_matrix <- read.csv("/Users/luciachen/Desktop/Desktop_MacbookPro/simulated_data/simulated_data_corr.csv")
 corr_matrix <- data.frame(corr_matrix, row.names = 1)
-
-
-#In this section we create a matrix for the storm variables to study the correlations between these variables.
-#storm vars
-var_names_storm <- c("Dx_UDS1_12m", "Dx_UDS2_12m", "Dx_UDS3_12m", "Rx_Medd", "Rx_Medd_10m", "Rx_Medd_11m", "Rx_Medd_1m", "Rx_Medd_2m", "Rx_Medd_3m", "Rx_Medd_4m", "Rx_Medd_5m", "Rx_Medd_6m", "Rx_Medd_7m", "Rx_Medd_8m", "Rx_Medd_9m","Dx_MDD_12m", "EH_Arrhythmia_12m", "EH_BlAnemia_12m", "EH_ChrnPulm_12m", "EH_Psychoses","EH_RheumArt_12m")
-
-
-selected_cor_storm <- corr_matrix[var_names_storm,var_names_storm]
-
-
-#corr_max_storm <- cov2cor(as.matrix(covariance_max_storm))
-write.csv(selected_cor_storm, "/Users/luciachen/Dropbox/simulated_data/sim_corr_max_storm_selected.csv")
-
-
-
-#we do the same procedures with the VA correlation table
-#select a subset of correlation from the the VAcorrelation table
-corr_matrix_va <- read.csv("/Users/luciachen/Dropbox/simulated_data/simulated_data_corr_va.csv")
-corr_matrix_va <- data.frame(corr_matrix_va, row.names = 1)
-
-
-#In this section we create a matrix for the storm variables to study the correlations between these variables.
-#storm vars
-var_names_va <- c("Ux_OP_PoC_ED_30days", "Ux_OP_PoC_ED_730days", "Ux_OP_PoC_UC_30days", "Ux_OP_PoC_UC_730days", "Ux_OP_PoC_TobaccoCessation_30day", "Ux_OP_PoC_TobaccoCessation_730da", "TotalNumOfAppt_91days",  "TotalNumOfAppt_730days", "Ux_OP_MHOC_HBPC_30days", "Ux_OP_MHOC_HBPC_730days", "Rx_OpioidForPain_0to182_D", "Rx_OpioidForPain_182to365_D", "Rx_Insomnia_0to365_D", "Rx_OpioidForPain_0to182_D", "Rx_OpioidForPain_182to365_D",  "Rx_Insomnia_0to365_D", "Paton_Rx_Insomnia", "Dx_SAE_Acetaminophen_0to1_Y", "Dx_SAE_Falls_0to1_Y", "Dx_SAE_OtherAccident_0to1_Y", "Dx_SAE_OtherDrug_0to1_Y", "Dx_SAE_Sedative_0to1_Y", "Dx_SAE_Vehicle_0to1_Y", "Dx_SedativeUD_0to1_Y", "Dx_SUD_CatchAll_RV2_0to1_Y", "Dx_AlcoholUD_0to1_Y", "Dx_Amphetamine_OtherStim_UD_0to1", "Dx_Pain_Neuropathy_0to1_Y", "Dx_Pain_Urogenital_0to1_Y", "Dx_Pain_Back_0to1_Y",  "Dx_Pain_Neck_0to1_Y", "Dx_Pain_Fibromyalgia_0to1_Y", "Dx_Endometriosis_0to1_Y", "Dx_PTSD_1to2_Y","Dx_Homeless_1to2_Y", "Dx_EH_Obesity_1to2_Y", "Rx_Anxiolytic_0to365_D", "agegroup_ls30", "agegroup_ge30", "agegroup_ge40", "agegroup_ge50", "agegroup_ge60", "agegroup_ge70", "sex_female", "race_White",  "Dx_OpioidOverdose_0to1_Y")
-
-selected_cor_va <- corr_matrix_va[var_names_va, var_names_va]
-                  
-write.csv(selected_cor_va, "/Users/luciachen/Dropbox/simulated_data/sim_corr_max_va_selected.csv")
-                  
-  
-
-
-
-
 ```
 
 
 
+Task 2: Generate shifted data 
+
+Draft section 4.2, paragraph 5
+"In order to assess the impact of data shift on our surrogate algorithm, we additionally created simulated datasets that incorporated shifted variables. Each of these shifted datasets involved decreasing the variable Medd by 5%, 10%, 20%, and 30%. Consequently, the corresponding dependent variables were modified proportionally according to the specified functional equation."
 
 
-
-Task 2: shift data distribution 
 ```{r datashift}
 
-#attempt 1: here we reduce the mean of the variable by certain percentage
+
+# This function takes a non 0 value and reduces it by a certain percentage.
+# Parameters:
+#   - val: the value to be reduced
+#   - redu: the reduction percentage
+# Returns: the reduced value
+
 reduction <- function (val, redu) {
   #this function reduce a value by certain amount
   if(val > 0) {
@@ -678,25 +718,37 @@ reduction <- function (val, redu) {
   return (new_val)
 }
 
+
+# Function: transform_mean
+# This function transforms a variable by reducing its mean value by a certain percentage.
+# Parameters:
+#   - percent: the percentage by which to reduce the mean value
+#   - var: the variable to be transformed
+# Returns: the transformed variable
+
 transform_mean <- function(percent, var){
-  #number of observation with y > 0
+  
+  # Calculate the number of observations with values greater than 0
   N1 <- sum(var != 0) 
-  #create a vector to be deducted by the original variable.  reduce value = mean * percent that we want to reduce, 
+  
+  # Calculate the reduction value by multiplying the mean of the variable by the desired reduction percentage
   reduce  <- mean(var)*percent
   print(reduce)
-  #normalize the vector
+  
+  # Normalize the reduction value by scaling it based on the number of observations with values 
   reduce_scaled <- reduce*(length(var)/N1)
   #print(reduce_scaled)
-  #apply reduction function on original variable, t
+  
+  # Apply the reduction function to each value in the original variable using the reduction value
   var_new <- unlist(mapply(FUN=reduction, val=var, redu = reduce_scaled, USE.NAMES=FALSE))
   
-    
   return (var_new)
 }
 
-#here we set the amount to be reduced, 0.1 means 10%
 
-reduce_precentage = 0.3 #suppose we reduce the mean by 10 percent, 
+# Set reduced percentage
+reduce_precentage = 0.3 
+# Generate new Medd
 Rx_Medd_new <- transform_mean(reduce_precentage, Rx_Medd)
 Rx_Medd_10m_new <- transform_mean(reduce_precentage, Rx_Medd_10m)
 Rx_Medd_11m_new <-transform_mean(reduce_precentage, Rx_Medd_11m)
@@ -710,10 +762,10 @@ Rx_Medd_7m_new <- transform_mean(reduce_precentage, Rx_Medd_7m)
 Rx_Medd_8m_new <- transform_mean(reduce_precentage, Rx_Medd_8m)
 Rx_Medd_9m_new <- transform_mean(reduce_precentage, Rx_Medd_9m)
 
-#regenerate variables depend on Medd
+# Regenerate variables dependent on Medd
+
 #X18: Urine drug screen for heroin/morphine past year
-#correlated but not overlapping
-#Dx_UDS1_12m <- rbinom(num_of_obs, 1,.08)
+
 error=rnorm(num_of_obs, 2, 10)
 xb <-   -16 +  1*Rx_Medd_new + 1*Rx_Medd_10m_new + 1*Rx_Medd_11m_new + 1*Rx_Medd_1m_new + 1*Rx_Medd_2m_new + 1*Rx_Medd_3m_new + 1*Rx_Medd_4m_new + 1*Rx_Medd_5m_new + 1*Rx_Medd_6m_new + 1*Rx_Medd_7m_new + 1*Rx_Medd_8m_new + 1*Rx_Medd_9m_new  + error
 p <- 1/(1 + exp(-xb))
@@ -784,3 +836,26 @@ simulated_data_reduced  <- simulated_data_reduced %>% rename("MH_Psychoses" = "E
 write.csv(simulated_data_reduced, "/Users/luciachen/Dropbox/simulated_data/simulated_data_big_sample_reduced_mean30.csv")
 
 ```
+
+Task 3: Generate data for falsification test
+Described in Draft section 3.8
+```{r datashift}
+dataFile <- read.csv("/Users/luciachen/Dropbox/simulated_data/data/simulated_data_big_sample.csv")
+# Extract outcome from simulated dataset
+outcome <- dataFile$Dx_OpioidOverdose_0to1_Y
+
+# Shuffle the outcome
+set.seed(872436)           
+outcome_rand <- sample(outcome) 
+
+#Replace the original outcome with the shuffled outcome
+dataFile$Dx_OpioidOverdose_0to1_Y <- outcome_rand 
+
+#Store file
+write.csv(dataFile, "/Users/luciachen/Dropbox/simulated_data/data/simulated_data_big_sample_shuffled_outcome.csv")
+
+```
+
+
+
+
