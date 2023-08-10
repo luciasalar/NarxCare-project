@@ -1,0 +1,412 @@
+---
+title: "plot_result"
+output: html_document
+date: '2023-06-09'
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(ggplot2)
+require(cowplot) 
+require(tibble)
+require(data.table)
+library(forcats) #reorder factor levels
+require(dplyr)
+```
+
+
+## plot general performance, Figure 3 and Figure 7 on the draft 
+
+Step 1: We extract columns from the result file to be used in the plots. The columns are:
+
+Column 3 represent weighted indicators for the results, indicating whether the result is from a weighted loss function. 
+Column 4- 10  represent performance metrics for the model. These include precision, recall, F1 score, accuracy, true positive rate (TPR), false positive rate (FPR), and positive predictive value (PPV). 
+
+Column 14 - 69 are specific metrics for different categories such as nonWhite, White, backpain, nonBackpain, neckpain, nonNeckpain, Neuropathy, nonNeuropathy, Fibromyalgia, noFibromyalgia, PTSD, no PTSD, MDD, noMDD, Homeless, and noHomeless. There are also metrics specific to gender, including male and female.
+
+Step 2: Create a table for plotting using the extracted columns.
+
+Step 3: Plot the table.
+
+For Figure 7, replace the result files with the falsification test result
+
+```{r general}
+# Read in the results from a weighted loss function and a non-weighted loss function into separate data frames from CSV files located at the given file paths.
+results_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted.csv')
+results_non_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_nonweighted.csv', row.names = NULL)
+
+#Load these files for the falsification test results [Figure 7]
+#results_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shuffled.csv')
+#results_non_weighted <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_nonweighted_shuffled.csv', row.names = NULL)
+#results_weighted <- results_weighted[-1,]
+
+#Calculate the mean of the "ks_score" column in both data frames 
+mean(results_weighted$ks_score)
+mean(results_non_weighted$ks_score)
+
+
+# "select_columns" takes in two arguments: a file (data frame) and a list of column numbers. The function then returns a new data frame that only contains the columns specified in the column list.
+select_columns <- function(file, columns){
+  new_file <- file[,columns]
+  return (new_file)
+}
+
+#Select specific columns from the "results_weighted" and "results_non_weighted" data frames for plotting.
+results_weighted_clean <- select_columns(results_weighted, c(3:10,14:69))
+results_non_weighted_clean <-  select_columns(results_non_weighted, c(3:10,14:69))
+
+#The plot function requires all the result data to be in one dataframe, therefore, we combine the two results data frames using the "rbind" function, and assigns the combined data frame to "results".
+results <- rbind(results_weighted_clean, results_non_weighted_clean)
+
+#Converts the "f1", "TPR", "FPR", "PPV", and "accuracy" columns in the "results" data frame to numeric data types.
+results$f1 <- as.numeric(results$f1)
+results$TPR <- as.numeric(results$TPR)
+results$FPR <- as.numeric(results$FPR)
+results$PPV <- as.numeric(results$PPV)
+results$accuracy <- as.numeric(results$accuracy)
+
+# Compute the mean and standard deviation of each evaluation metric for each group
+# Add a column for the evaluation metric
+get_mean_sd <- function(metric, file){
+  #metric: metric name, col_num: var_column, file: processed file with selected columns
+  file %>%
+      group_by(weighted, feature_set) %>%
+      summarise_at(c(metric), funs(mean, sd)) %>% add_column(evaluation = metric) %>% as.data.frame()  -> df
+  
+  return (df)
+  
+}
+  
+f1_df <- get_mean_sd('f1',  results)
+TPR_df <- get_mean_sd('TPR',  results)
+FPR_df <- get_mean_sd('FPR', results)
+PPV_df <- get_mean_sd('PPV', results)
+accuracy_df <- get_mean_sd('accuracy', results)
+
+
+#combine all the grouped result metrics
+all_df <- rbind(TPR_df, f1_df)
+all_df <- rbind(all_df, FPR_df)
+all_df <- rbind(all_df, PPV_df)
+all_df <- rbind(all_df, accuracy_df)
+
+# function to plot a graph
+plot_graph <- function(grouped_df, x_label) { 
+  
+  
+  # Set desired dodge width
+  pd <- position_dodge(width = 0.4) 
+  
+  # Create the plot
+  my_plot <-ggplot(grouped_df, aes(x= feature_set, y=mean, color= weighted)) +
+    geom_point(position=pd)+ # Add points to the plot
+    
+     # Add error bars to show the confidence interval for the mean
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,
+                  position=pd) +
+    
+     # Set the x and y labels for the plot
+    xlab(x_label) +
+    ylab('Score') +
+    theme_bw() + # Set the theme of the plot to a black and white style
+    
+    # Customize the appearance of the axis labels, ticks, and legend
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12), axis.text = element_text(size= 12),  axis.title = element_text(size= 12), strip.text = element_text(size = 12), legend.position = "top", legend.text=element_text(size=12)) + 
+    
+      # Add facetting to the plot for different evaluations
+    facet_grid(cols = vars(evaluation)) +
+    
+      # Customize the legend title
+    labs(color="Loss Function Type")
+  
+
+  return(my_plot)
+  
+}
+
+#plot charts
+p <- plot_graph(all_df, 'Feature Sets')
+p 
+
+
+```
+
+#Plot feature sets and group performance, Figure 4 on Draft
+
+Step 1: Generate a data frame containing results of a particular feature set for plotting
+Here we select the group metrics columns for plotting. The selected columns 11 - 64 are specific metrics for different categories such as nonWhite, White, backpain, nonBackpain, neckpain, nonNeckpain, Neuropathy, nonNeuropathy, Fibromyalgia, noFibromyalgia, PTSD, no PTSD, MDD, noMDD, Homeless, and noHomeless. There are also metrics specific to gender, including male and female.
+
+Step 2: Create a table for plotting using the extracted columns.
+
+Step 3: Plot the table.
+
+```{r group, echo=FALSE}
+
+# Generate a data frame containing results of a particular feature set for plotting
+# The input to this function is the feature set name and a file containing the results.
+# The output is a dataframe containing group metrics for the given feature set.
+
+get_group_result <- function(which_fea_set, file) {
+  
+  
+    # Filter the file to get results for the specified feature set, using only the weighted algorithm
+    results_fea1 <- file[file$weighted == 'weighted' & file$feature_set == which_fea_set,]
+    
+    # Select only the group metrics columns
+    results_fea1 <- results_fea1[, 11:64]
+    
+    # Add a unique identifier column to the dataframe
+    results_fea_id <- results_fea1 %>% mutate(id = row_number())
+    
+    # Reshape the dataframe from wide format to long format
+    results_long <- melt(setDT(results_fea_id), id.vars = c("id"), variable.name = "group_metrics")
+    
+     # Calculate mean and standard deviation for each group metric
+    results_long  %>%
+            group_by(group_metrics) %>%
+            summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> group_fair_df2
+    
+    # Add the feature set name to the dataframe: set 1, set 2
+    group_fair_df2$feature_set <- which_fea_set
+    
+    # Extract the metric names and group names from the group_metrics column
+    group_fair_df2$metric_names <- unlist(lapply(as.character(group_fair_df2$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][1])))
+    group_fair_df2$group_names  <- unlist(lapply(as.character(group_fair_df2$group_metrics), function(x) as.character(strsplit(x, '_')[[1]][2])))
+
+    # Define complementary and marginalized groups based on the group names
+    complementary  <- group_fair_df2[grepl('no', group_fair_df2$group_names), ] # group name with "no" belong to complementary group 
+    sensitive_grp <-setdiff(group_fair_df2, complementary) # the rest of groups are sensitive groups
+    complementary$group_type <- 'complementary'
+    sensitive_grp$group_type <- 'marginalized'
+    
+    # Combine the complementary and marginalized groups into a single dataframe
+    com_sen_df <- rbind(complementary, sensitive_grp)
+    # Update the group_type column based on specific group names
+    com_sen_df$group_type[com_sen_df$group_name == 'male'] <- 'complementary'
+    com_sen_df$group_type[com_sen_df$group_name == 'White'] <- 'complementary'
+    com_sen_df$group_type[com_sen_df$group_name == 'nonWhite'] <- 'marginalized'
+    
+    # Add the general performance metrics to the dataframe 
+    # Calculate the mean of TPR, FPR, and PPV and assign it to general_performance column
+    com_sen_df$general_performance[com_sen_df$metric_names == "TPR"]  <- mean(com_sen_df[com_sen_df$metric_names == "TPR",]$mean, na.rm=TRUE)
+    com_sen_df$general_performance[com_sen_df$metric_names == "FPR"]  <- mean(com_sen_df[com_sen_df$metric_names == "FPR",]$mean, na.rm=TRUE)
+    com_sen_df$general_performance[com_sen_df$metric_names == "PPV"]  <- mean(com_sen_df[com_sen_df$metric_names == "PPV",]$mean, na.rm=TRUE)    
+    
+    # Recode the group names to simplify their labels for the x axis in the plot 
+    com_sen_df %>% mutate(group_names=recode(group_names, "backpain" = "Back pain", "neckpain"= "Neck pain",  "nonNeckpain"= "Neck pain", 'White'='non-White', 'nonWhite' = 'non-White', "nonBackpain" = "Back pain", "nonNeckpain" = "Neck pain", "nonNeuropathy"="Neuropathy" ,"noFibromyalgia"= "Fibromyalgia",  "noPTSD"= "PTSD", "noMDD"= "MDD",  "noHomeless"= "Homeless", "male" = 'Female', 'female' = 'Female')) -> com_sen_df
+  
+    # Return the final dataframe containing the results of the group metrics for the given feature set
+   return(com_sen_df)
+  
+}
+
+# Get data frame with results from specified feature set
+com_sen_df_set1 <- get_group_result('set1', results)
+com_sen_df_set2 <- get_group_result('set2', results)
+
+# Combine the two dataframes into one table
+all  <- rbind(com_sen_df_set1,com_sen_df_set2)
+
+# This function takes in two parameters: "grouped_df" and "x_label" to create a plot using the "grouped_df" data frame, with the x-axis label specified by the "x_label" parameter.
+plot_group_feature <- function(grouped_df, x_label) {
+  
+    # Set the dodge width for the position of the points on the plot using the "position_dodge" function. 
+    pd <- position_dodge(width = 0.5) 
+    
+    # Create a ggplot object using the "grouped_df" data frame and assigns it to the variable "my_plot". The points on the plot are positioned using the dodge width set earlier.
+    my_plot <-ggplot(grouped_df, aes(x= group_names, y=mean, color=group_type)) +
+    geom_point(position=pd)+
+    
+    # Add error bars to represent the confidence interval of the mean.
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,
+                  position=pd) +
+    xlab(x_label) +
+    ylab('score') +
+    
+    # The plot is then split into facets using the "facet_grid" function, with "metric_names" used for the columns and "feature_set" used for the rows.
+    facet_grid(cols = vars(metric_names), rows = vars(feature_set)) + theme_bw() +  # Set a black and white theme
+      
+    #A horizontal dashed line is added to the plot, representing the general performance level.
+    geom_hline(data = grouped_df, aes(yintercept = general_performance), linetype = 'dashed', color ='red') +
+    
+    # Adjust the appearance of the plot, such as the size of the axis text, the legend position, and the size of the legend and strip text.
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 12), axis.text = element_text(size= 12),  axis.title = element_text(size= 12), legend.position = "top", strip.text = element_text(size = 12), legend.text=element_text(size=12)) + labs(color="Group Type") + xlab("Group Metrics") + ylab("Score")
+
+  return(my_plot)
+  
+}
+
+plot_group_feature(all, 'group_metrics')
+
+```
+
+
+# Plot shifted data performance, Figure 6 on draft
+Step 1:  Imports data from all the shifted result csv files and combines the tables into one table. 
+
+Step 2:  Create dataframe for plotting. The selected columns 6-10 are performance metrics for the model. These include precision, recall, F1 score, accuracy, true positive rate (TPR), false positive rate (FPR), and positive predictive value (PPV). Column 70 represent the shifted data type used in model training.
+
+Step 3:  Plot the data frame
+
+
+
+```{r datashift, echo=FALSE}
+#read results of data shift models
+results_weighted5 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift5.csv')
+results_weighted10 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift10.csv')
+results_weighted20 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift20.csv')
+results_weighted30 <- read.csv('/Users/luciachen/Dropbox/simulated_data/results/test_result_weighted_shift30.csv')
+
+
+# Assigning a value of "no_shift" to the column "shifted" in the general performance table
+results_weighted$shifted <- 'no_shift'
+
+# Combining all the results tables into one table
+combined_results <- rbind(results_weighted5, results_weighted10)
+combined_results <- rbind(combined_results, results_weighted20)
+combined_results <- rbind(combined_results, results_weighted30)
+combined_results <- rbind(combined_results, results_weighted)
+
+# Selecting only the rows from the table "combined_results" where the column "feature_set" has a value of "set1"
+combined_results <- combined_results[combined_results$feature_set == 'set1',]
+
+# Change the values in the "shifted" column of the "combined_results" table to corresponding labels
+combined_results <- combined_results  %>% mutate(shifted=recode(shifted, "5" = "shifted1", "10"= "shifted2", "20"= "shifted3", "30"= "shifted4"))
+
+# Define a function to generate table for plotting
+get_shifted_model_df <- function(file){
+    
+    # Select specific result columns from the input table
+    file <- file[,c(6:10, 70)]
+    results_long <- melt(setDT(file), id.vars = c("shifted"), variable.name = "group_metrics")
+    
+    # Group the data by "group_metrics" and "shifted" and calculate mean and standard deviation
+    results_long  %>%
+        group_by(group_metrics, shifted) %>%
+        summarise_at(vars(value), funs(mean, sd)) %>% as.data.frame()  -> shifted_plot_df
+
+  # Return a data frame with group evaluation results and group name variables 
+  return(shifted_plot_df)
+  
+}
+
+shifted_plot_df <- get_shifted_model_df(combined_results)
+
+# Define a function to plot the group shift general performance
+plot_group_shift_general <- function(grouped_df, x_label) {
+  
+    # Set the dodge width for the plot
+    pd <- position_dodge(width = 0.5)
+    
+    # Create the plot using the input data frame
+    my_plot <-ggplot(grouped_df, aes(x= group_metrics, y=mean, color=shifted)) +
+    # Add scatter points
+    geom_point(position=pd, size= 2)+
+    # Add error bars
+    geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.3,
+                  position=pd) +
+      
+    # Set the x and y labels
+    xlab(x_label) +
+    ylab('score') + theme_bw() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5, size= 14), axis.text.y = element_text(size= 14), axis.title = element_text(size = 14), legend.text=element_text(size=12)) + ylab("Score") + xlab("Metrics")
+
+  return(my_plot)
+  
+}
+
+#plot general performance
+plot_group_shift_general(shifted_plot_df, 'shifted_models')
+
+```
+
+
+#Poduce the plot that compares overdose and non-overdoes observations in each bin, Figure 1 on draft
+
+Step 1: Read prediction probability results and construct table for plotting
+We extract the following columns from the result file for plotting: 
+- positive_class: probability of an observation being classifed as positive (Have overdose incident)
+- negative_class: probability of an observation being classifed as negative (not having overdose incident)
+- Medd: Morphine equivalent daily dose on index date (the most recent record)
+- Dx_OpioidOverdose_0to1_Y: indicator of whether an observation has an overdose incident in the past 1 year.
+
+We rescale the positive_class to 0 - 990 then bin the scores with an increment of 50.
+Then we calculate the overdose incident rate and non-overdose rate in each bin.
+
+
+Step 2: Plot tables
+
+```{r plot_compare, echo=FALSE}
+# Read prediction probability results from weighted and non-weighted loss function
+probFile_nw <- read.csv("/Users/luciachen/Dropbox/simulated_data/results/prob_plot.csv") # non-weigthed loss function
+probFile_w <- read.csv("/Users/luciachen/Dropbox/simulated_data/results/prob_plot_weighted.csv") # weighted loss function
+ 
+#This function plots and compares the scores of overdose and non-overdose observations.
+plot_compare_scores<- function(File){
+  
+      #Extract the variables from the File for plotting
+      y_probs <- File$positive_class # probability of an observation being classifed as positive (Have overdose incident)
+      y_test <- File$Dx_OpioidOverdose_0to1_Y #
+      Medd <- File$Rx_Medd
+      
+      # Rescale the prediction probabilities to a range of 0-990
+      rescaled_scores <- rescale(y_probs, to=c(0, 990))
+      summary(rescaled_scores)
+      
+      # Create a data frame called 'compare' that includes the rescaled scores, prediction probabilities, outcomes, and Medd
+      compare <- data.frame(rescaled_scores, y_probs, y_test, Medd)
+      colnames(compare) <- c('rescaled_scores', 'y_probs', 'Dx_OpioidOverdose_0to1_Y', 'Rx_Medd')
+      
+      #Round up the rescaled scores
+      compare$rescaled_scores <- round(compare$rescaled_scores) 
+      
+      # Bin the scores according to thresholds defined by NarxCare and create a new column called 'points_bin'
+      binned <- compare %>% mutate(points_bin = cut(rescaled_scores, breaks=c(0, 50, 100, 150, 200, 250,  300, 350, 400, 450, 500, 550, 600, 650, 700,750, 800, 850, 900, 950, 1000)))
+      
+      # Aggregate the sum of overdose observations in each bin
+      overdose_bins_cul <- aggregate(Dx_OpioidOverdose_0to1_Y ~ points_bin, binned, sum)
+      
+      #Revert the coding of the 'Dx_OpioidOverdose_0to1_Y' variable to get the sum of non-overdose observations in each bin
+      binned$recoded_y <- -1 * (compare$Dx_OpioidOverdose_0to1_Y - 1) 
+      overdose_bins_cul_zero <- aggregate(recoded_y ~ points_bin, binned, sum)
+      
+      # Calculate the percentage of overdose and non-overdose observations in each bin
+      overdose_bins_cul$percentage <- overdose_bins_cul$Dx_OpioidOverdose_0to1_Y / sum(overdose_bins_cul$Dx_OpioidOverdose_0to1_Y)
+      overdose_bins_cul_zero$percentage <- overdose_bins_cul_zero$recoded_y / sum(overdose_bins_cul_zero$recoded_y)
+      
+      # Create a new column called 'group' and assign 'overdose' or 'non-overdose' depending on the data
+      overdose_bins_cul$group <- 'overdose'
+      overdose_bins_cul_zero$group <-'non-overdose'
+      
+      # Combine the columns from overdose_bins_cul and overdose_bins_cul_zero data frames to form a table for plotting
+
+      overdose <- data.frame(overdose_bins_cul$percentage, overdose_bins_cul$points_bin, overdose_bins_cul$group)
+      colnames(overdose) <- c('percentage', 'points_bin', 'group')
+      non_overdose<- data.frame(overdose_bins_cul_zero$percentage, overdose_bins_cul_zero$points_bin, overdose_bins_cul_zero$group)
+      colnames(non_overdose) <- c('percentage', 'points_bin', 'group')
+      
+      #Combine overdose and non-overdose data frames to create the final data frame for the bar chart
+      bar_chart_df <- rbind(overdose, non_overdose)
+      
+      return(bar_chart_df)
+      
+}
+
+bar_chart_df_weighted <- plot_compare_scores(probFile_w)
+bar_chart_df_nonweighted <- plot_compare_scores(probFile_nw)
+
+# Plot the tables
+compare_w <- ggplot(bar_chart_df_weighted, aes(points_bin, percentage)) +   
+  geom_bar(aes(fill = group), position = "dodge", stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5, size = 14), axis.text.y = element_text(size = 14), axis.title.y = element_text(size = 16), legend.text=element_text(size=12), axis.title.x = element_blank(), legend.position = "none") +  scale_fill_manual(values=c("#2B3467", "#EB455F"))
+
+compare_nw <- ggplot(bar_chart_df_nonweighted, aes(points_bin, percentage)) +   
+  geom_bar(aes(fill = group), position = "dodge", stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5, size = 14), axis.text.y = element_text(size = 14), axis.title.y = element_text(size = 16), legend.text=element_text(size=12), axis.title.x = element_blank(), legend.position = c(0.8,0.8)) +  scale_fill_manual(values=c("#2B3467", "#EB455F"))
+
+# Put two plots in a grid
+plot_grid(compare_w, compare_nw, labels = "AUTO")
+
+```
+
