@@ -1,13 +1,18 @@
+#`features` is a dictionary that contains two sets (`set1` and `set2`) of features for the experiment. The features in these sets include: `TobaccoCessation`, `Ux`, `Insomnia`, `Dx`, `MOPROB`, `age`, `sex`, `race`, and `Rx`.  `Rx` selects Medd variables opioid prescriptions, insomnia , `Ux` represents the hospital visits, `Dx` selects other high risk behavior patterns 
+
+# In `set2`, the additional features `MH`, `EH`, and `PA` are included. `MH` represents mental health, `EH` represents other conditions, and `PA` represents pain conditions.
+
 features:
-    set1: ['TobaccoCessation', 'Ux', 'Insomnia', "Dx","MOPROB", "age", "sex", "race", "Rx"] #Ux denotes the hospital visits, Rx denote drug use, Dx denote serious events, 
-    set2: ['TobaccoCessation', 'Ux', 'Insomnia', "Dx","MOPROB", "age", "sex", "race", "Rx", "MH", "EH", "PA"] #include "MH" mental health, "EH" other conditon, "PA" pain conditions
+    set1: ['Ux', "Dx", "age", "sex", "race", "Rx"] #Ux denotes the hospital visits, Rx denote drug use, Dx denote serious events, 
+    set2: ['Ux', "Dx", "age", "sex", "race", "MH", "EH", "PA"] #include "MH" mental health, "EH" other conditon, "PA" pain conditions
 
+#`experiment` is a dictionary that specifies the parameters for the experiment using the `sklearn.linear_model.LogisticRegression` classifier.
 experiment:
-    sklearn.linear_model.LogisticRegression:
-        clf__classifier__penalty: ['none']   #
-        clf__classifier__n_jobs: [-1]   #set number of cpus 
-        clf__classifier__max_iter: [10000] #number of max iteration
-      
 
+    sklearn.linear_model.LogisticRegression:
+        clf__classifier__penalty: ['none']   # no penalty is applied.
+        clf__classifier__n_jobs: [-1]   # utilizes all available CPUs for computation.
+        clf__classifier__max_iter: [10000] # the maximum number of iterations to converge.
+     
 
 
