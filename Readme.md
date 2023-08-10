@@ -142,3 +142,23 @@ To run the `training_models.py` file:
 4. To use the weighted loss function model, Change the path to `experiment.yaml` on your local machine  on line 388. Rememer also to change the result file names.
 
 
+# Experiments
+This repository contains a paper and its accompanying experiments. The experiments conducted are as follows:
+
+### Experiments Conducted
+1. Run both the weighted and non-weighted surrogate algorithm in the `training_models.py` file on the simulated dataset (`simulated_data_big_sample.csv`). This task has been completed.
+
+2. Run both the weighted and non-weighted surrogate algorithm in the `training_models.py` file on the simulated dataset with shifted variables, including `simulated_data_big_sample_reduced_mean5.csv`, `simulated_data_big_sample_reduced_mean10.csv`, `simulated_data_big_sample_reduced_mean20.csv`, and `simulated_data_big_sample_reduced_mean30.csv`. This task has been completed.
+
+3. Conduct a falsification test on simulated data with shuffled outcome using the `simulated_data_big_sample_shuffled_outcome.csv` file. This task has been completed.
+
+### Remaining Tasks
+
+#### Run both the weighted and non-weighted surrogate algorithm in the `training_models.py` file on the VA dataset.
+
+1.  Recode the VA variable name or adjust the variable selection in the `experiment.yaml` file to ensure that the algorithm correctly selects feature set 1 and set 2. The feature sets are documented in the manuscript.
+
+2.  Modify the path configuration in the `training_models.py` file to match your local machine, and ensure that the algorithm correctly selects feature set 1 and set 2. The feature sets are documented in the manuscript.
+
+3. Modify the path configuration in the `training_models.py` file to match your local machine, and complete the remaining tasks as necessary.
+
