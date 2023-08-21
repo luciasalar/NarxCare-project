@@ -22,6 +22,8 @@ import glob
 import os
 import random
 
+#1. run R script to generate data
+
 
 def load_experiment(path_to_experiment):
 	#load experiment parameters from the yaml file
@@ -136,9 +138,9 @@ class ColumnSelector:
 			cols_error = list(set(self.columns) - set(X.columns))
 			raise KeyError("The DataFrame does not include the columns: %s" % cols_error)
 
-	def get_feature_names(self):
-		## Returns the list of selected column names
-		return self.columns.tolis
+	# def get_feature_names(self):
+	# 	## Returns the list of selected column names
+	# 	return self.columns.tolis
 
 
 class Training:
@@ -377,6 +379,27 @@ class Training:
 		return TPR_1, FPR_1, PPV_1, TPR_0, FPR_0, PPV_0 
 	
 
+def get_loss_func_weights():
+	"""
+	Get class weight for loss function according to population and cohort size, see draft secion 3.4 
+	"""
+
+	# read data
+	data = pd.read_csv(path + "data/simulated_data_big_sample.csv")
+	# count of case in population
+	count_of_case_pop = len(data.loc[data['Dx_OpioidOverdose_0to1_Y'] == 1]) 
+	# count of control in population
+	count_of_control_pop = len(data.loc[data['Dx_OpioidOverdose_0to1_Y'] == 0])
+	# count of control in cohort
+	count_of_control_cohort = count_of_case_pop * 100
+	#  W is inverse probability of case or control being drawn from the population in each experiment, therefore, weight of control is:
+	W_control = count_of_control_pop/count_of_control_cohort
+	W_case = 1
+	# normalize W_control and W_case so that they sum up to 1
+	W_case_normal = round(W_case/(W_control + W_case), 2)
+	W_control_normal = round(W_control/(W_control + W_case), 2)
+
+	return W_case_normal, W_control_normal
 
 
 #preprocess data, get train, test and outcome
@@ -389,10 +412,21 @@ experiment = load_experiment(path + 'experiment.yaml')
 #change experiment to weighted loss function
 #experiment = load_experiment(path + 'experiment_weighted.yaml')
 
+# Get class weight for loss function according to population and cohort size 
+W_case_normal, W_control_normal = get_loss_func_weights()
+
+# modify the weights of the experiment file
+# first check if class weight is in the parameter dictionary, if yes, modify the weights accordingly.
+if 'clf__classifier__class_weight' in experiment['experiment']['sklearn.linear_model.LogisticRegression']:
+	experiment['experiment']['sklearn.linear_model.LogisticRegression']['clf__classifier__class_weight'] = [{0: W_control_normal, 1: W_case_normal}]
+
 #store results
 file_exists = os.path.isfile(path + 'results/test_result_{}.csv'.format(file_number)) #remember to create a results folder
 f = open(path + 'results/test_result_{}.csv'.format(file_number), 'a')
 writer_top = csv.writer(f, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+
+
+
 
 #if result file doesn't exist, create file and write column names
 if not file_exists:
