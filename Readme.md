@@ -133,8 +133,9 @@ Creation process of the datasets are describe in the manuscript section 4.2
 - `simulated_data_big_sample_reduced_mean30csv`: Shifted dataset with Medd reduced mean by 30
 
 
-
 ## How to Run the Model File
+
+Before you run the model file, you need to run `generate_simulated_data.Rmd` to generate simulated data `simulated_data_big_sample.csv`. In  `generate_simulated_data.Rmd`, you can set `reduced_percentage` in Task 2: Generate shifted data to generate shifted datasets. Task 3: Generate data for falsification test outputs file `simulated_data_big_sample_shuffled_outcome.csv`.
 
 To run the `training_models.py` file:
 1. Change the path to your local machine on line 384: `path = <yourPath>`
